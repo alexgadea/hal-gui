@@ -21,8 +21,8 @@ import HGUI.Config
 import HGUI.Utils
 
 -- Configura el lenguaje para el sourceView.
-configLanguage :: SourceBuffer -> IO ()
-configLanguage buf = do
+configLanguage :: SourceBuffer -> LangInfo -> IO ()
+configLanguage buf langinfo = do
     -- Language Spec
     slm <- sourceLanguageManagerNew
     path <- sourceLanguageManagerGetSearchPath slm
@@ -30,7 +30,7 @@ configLanguage buf = do
     
     mlang <- sourceLanguageManagerGuessLanguage 
                 --slm (Just languageSpecFunFile) (Just funMimeType)
-                slm (Just languageSpecFunFile) (Just funMimeType)
+                slm (Just (specFile langinfo)) (Just (mimeType langinfo))
     case mlang of
         Nothing -> putStrLn "WARNING: No se puede cargar el highlighting para el lenguaje"
         Just lang -> do
@@ -43,7 +43,7 @@ configLanguage buf = do
             -- Style Scheme
             stm <- sourceStyleSchemeManagerNew
             sourceStyleSchemeManagerSetSearchPath stm (Just [textStylesFolder])
-            styleSch <- sourceStyleSchemeManagerGetScheme stm "lisa"        
+            styleSch <- sourceStyleSchemeManagerGetScheme stm (langName langinfo)        
             sourceBufferSetStyleScheme buf (Just styleSch)
 
 -- | Configuración del sourceView.
@@ -72,11 +72,11 @@ configNotebook nb = io $
                    ]
 
 -- | Crea un campo de texto y lo llena, de ser posible, con el string.
-createSourceView :: IO SourceView
-createSourceView = do
+createSourceView :: LangInfo -> IO SourceView
+createSourceView langi = do
             hbox <- hBoxNew False 0
             buf <- sourceBufferNew Nothing
-            configLanguage buf
+            configLanguage buf langi
             
             sourceview <- sourceViewNewWithBuffer buf
 
@@ -105,7 +105,25 @@ configTextCode = ask >>= \content ->
             
             io $ widgetShowAll box
 
+configTextVerif :: GuiMonad ()
+configTextVerif = ask >>= \content ->
+        do
+            swindow <- io $ scrolledWindowNew Nothing Nothing
+            io $ configScrolledWindow swindow
+                        
+            let textver = content ^. gTextVerif
             
+            io $  containerAdd swindow textver
+            
+            let notebook = content ^. gHalNotebook
+            
+            Just abox <- io $ notebookGetNthPage notebook 1
+            
+            let box = castToVBox abox
+            
+            io $ containerAdd box swindow
+            
+            io $ widgetShowAll box
 
 
 -- | Crea un editBook, el cual tiene un primer campo de texto con nombre 

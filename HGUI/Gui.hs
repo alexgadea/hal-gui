@@ -17,13 +17,14 @@ import HGUI.File
 import HGUI.Console
 import HGUI.GState
 import HGUI.SymbolList
+import HGUI.Config
 
 main :: IO ()
 main = do 
     initGUI
     
     xml <- builderNew
-    builderAddFromFile xml "hal2.ui"
+    builderAddFromFile xml "hal.ui"
     
     mainHalGui xml
 
@@ -35,8 +36,10 @@ mainHalGui xml = do
 
                 runRWST (do configWindow
                             configTextCode
+                            configTextVerif
                             configMenuBarButtons  xml
                             configSymbolList
+                            configNotebook
                          ) gReader gState
 
                 return ()
@@ -65,7 +68,9 @@ makeGState xml = do
         
         configConsoleTV infoTV infoTBuf
         
-        sourceview <- createSourceView
+        textcode <- createSourceView halLangInfo
+        
+        textverif <- createSourceView funLangInfo
         
         let halToolbarST   = HalToolbar symFrameB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
@@ -82,7 +87,9 @@ makeGState xml = do
                                halEditorPaned
                                window
                                notebook
-                               sourceview
+                               textcode
+                               textverif
+                               textcode
         
         return (gReader,gState)
 
@@ -148,3 +155,9 @@ configWindow = ask >>= \content ->
             onDestroy window mainQuit
             return ()
 
+configNotebook :: GuiMonad ()
+configNotebook = return ()
+    
+    
+    
+    

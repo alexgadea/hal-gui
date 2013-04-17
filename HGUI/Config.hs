@@ -7,15 +7,34 @@ import Graphics.UI.Gtk
 
 languageSpecFolder = "HGUI/sourceview/language-specs"
 
-languageSpecFunFile = languageSpecFolder ++ "/hal.lang"
+languageSpecFunFile = languageSpecFolder ++ "/fun.lang"
 
 anotherLanguage = languageSpecFolder ++ "/haskell.lang"
 
 textStylesFolder = "HGUI/sourceview/styles"
 
-textStyleFile = textStylesFolder ++ "/hal.xml"
+textStyleFileFun = textStylesFolder ++ "/fun.xml"
 
-funMimeType = "text/hal"
+funMimeType = "text/fun"
+
+languageSpecHalFile = languageSpecFolder ++ "/hal.lang"
+
+textStyleFileHal = textStylesFolder ++ "/hal.xml"
+
+halMimeType = "text/hal"
+
+
+
+data LangInfo = LangInfo {
+                    specFile :: String
+                  , styleFile :: String
+                  , mimeType :: String
+                  , langName :: String
+}
+
+funLangInfo = LangInfo languageSpecFunFile textStyleFileFun funMimeType "fun"
+
+halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "hal"
 
 -- Para el identado:
 

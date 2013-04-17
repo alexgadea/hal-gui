@@ -48,6 +48,8 @@ data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gHalWindow          :: Window
                          , _gHalNotebook        :: Notebook
                          , _gTextCode           :: SourceView
+                         , _gTextVerif          :: SourceView
+                         , _gCurrentText        :: SourceView
                          }
 $(mkLenses ''HGReader)
 

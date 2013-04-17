@@ -6,6 +6,7 @@ import Equ.Theories
 import Equ.Syntax
 
 import Graphics.UI.Gtk hiding (eventButton, eventSent,get)
+import Graphics.UI.Gtk.SourceView
 
 import Data.Text(unpack)
 
@@ -128,7 +129,17 @@ eventsSymbolList iv list = do
             return ()
 
 oneSelection :: ListStore SymItem -> TreePath -> GuiMonad ()
-oneSelection list path = return ()
+oneSelection list path = ask >>= \content -> 
+            do
+                let sv = content ^. gCurrentText 
+                el <- io (getElem list path)
+                F.mapM_ (addToCursorBuffer sv) el
+    where
+        addToCursorBuffer :: SourceView -> String -> GuiMonad ()
+        addToCursorBuffer sv repr = io $ do
+                buf <- textViewGetBuffer sv
+                textBufferInsertAtCursor buf repr
+                widgetGrabFocus sv
 
 getElem :: ListStore a -> TreePath -> IO (Maybe a)
 getElem l p = treeModelGetIter l p >>= \i ->
