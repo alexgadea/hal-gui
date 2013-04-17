@@ -17,7 +17,8 @@ import Data.Text hiding (take,init,drop)
 import HGUI.GState
 import HGUI.TextPage
 import HGUI.Utils
-import HGUI.EvalConsole (resetEnv)
+
+import Hal.Parser(parseFromString)
 
 import Lens.Family
 
@@ -138,3 +139,14 @@ saveDialog label filename fileFilter serialItem = do
 -- | Filtro de programas de fun.
 halFileFilter :: (FileChooserClass f, MonadIO m) => f -> m ()
 halFileFilter dialog = io $ setFileFilter dialog ["*.lisa"] "Programa de hal"
+
+
+compile :: GuiMonad ()
+compile = get >>= \ref -> ask >>= \content ->
+        do
+        code <- getCode
+        case parseFromString code of
+            Left er -> return ()
+            Right prg -> updateHGState ((<~) gHalPrg (Just prg))
+
+

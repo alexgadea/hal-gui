@@ -9,12 +9,11 @@ import Lens.Family
 import Lens.Family.TH
 
 -- Import de la interfaz de fun como libreria.
-import qualified GUI.Gui as GuiFun (mainFunGui)
-import qualified GUI.GState as GStateFun (GReader,GStateRef)
+-- import qualified GUI.Gui as GuiFun (mainFunGui)
+-- import qualified GUI.GState as GStateFun (GReader,GStateRef)
 
 import HGUI.TextPage
 import HGUI.File
-import HGUI.EvalConsole
 import HGUI.Console
 import HGUI.GState
 import HGUI.SymbolList
@@ -24,72 +23,66 @@ main = do
     initGUI
     
     xml <- builderNew
-    builderAddFromFile xml "hal.ui"
+    builderAddFromFile xml "hal2.ui"
     
-    (gReaderFun,gStateRefFun) <- GuiFun.mainFunGui xml
-    mainHalGui gReaderFun gStateRefFun xml
+    mainHalGui xml
 
     mainGUI
 
-mainHalGui :: GStateFun.GReader -> GStateFun.GStateRef -> Builder -> IO ()
-mainHalGui gReaderFun gStateRefFun xml = do
-                (gReader,gState) <- makeGState gReaderFun gStateRefFun xml
+mainHalGui :: Builder -> IO ()
+mainHalGui xml = do
+                (gReader,gState) <- makeGState xml
 
-                runRWST (do configTextPage
+                runRWST (do configWindow
+                            configTextCode
                             configMenuBarButtons  xml
                             configSymbolList
-                            configCommandConsole
                          ) gReader gState
 
                 return ()
 
 -- | Genera el estado inicial de la mónada.
-makeGState :: GStateFun.GReader -> GStateFun.GStateRef -> 
-              Builder -> IO (HGReader,HGStateRef) 
-makeGState gReaderFun gStateRefFun xml = do
+makeGState :: Builder -> IO (HGReader,HGStateRef) 
+makeGState xml = do
         
         symFrameB <- builderGetObject xml castToToggleToolButton "symHFrameButton"
         
-        loadedMod  <- builderGetObject xml castToLabel "halLabelLoadedModule"
-        
-        symFrame   <- builderGetObject xml castToFrame "halSymFrame"
-        goLeftBox  <- builderGetObject xml castToHBox "halSymGoLeftBox"
-        scrollW    <- builderGetObject xml castToScrolledWindow "halSwSymbolList"
-        symIV      <- builderGetObject xml castToIconView "halSymbolList"
-        goRightBox <- builderGetObject xml castToHBox "halSymGoRightBox"
+        symFrame   <- builderGetObject xml castToFrame "symFrame"
+        goLeftBox  <- builderGetObject xml castToHBox "symGoLeftBox"
+        scrollW    <- builderGetObject xml castToScrolledWindow "swSymbolList"
+        symIV      <- builderGetObject xml castToIconView "symbolList"
+        goRightBox <- builderGetObject xml castToHBox "symGoRightBox"
+
+        edPaned <- builderGetObject xml castToVPaned "edPaned"
         
         window <- builderGetObject xml castToWindow "mainWindow"
         
-        edPaned <- builderGetObject xml castToVPaned "halEditorPaned"
-        commTV <- builderGetObject xml castToTextView "halCommandTView"
-        commEntry <- builderGetObject xml castToEntry "halCommandEntry"
-        halStatusbar <- builderGetObject xml castToStatusbar "halStatusBar"
-        infoTV <- builderGetObject xml castToTextView "halInfoConsoleTView"
-        
-        panedSetPosition edPaned 400
-        
-        commTBuf <- textViewGetBuffer commTV
+        notebook <- builderGetObject xml castToNotebook "notebook1"
+
+        infoTV <- builderGetObject xml castToTextView "infoConsoleTView"
         
         infoTBuf <- textViewGetBuffer infoTV
         
         configConsoleTV infoTV infoTBuf
         
+        sourceview <- createSourceView
+        
         let halToolbarST   = HalToolbar symFrameB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
-            halCommConsole = HalCommConsole commEntry commTBuf commTV
             halEditorPaned = HalEditorPaned edPaned
             halTextPage    = HalTextPage Nothing False
         
         gState <- newRef $ 
-                      HGState gStateRefFun 
-                              halTextPage
+                      HGState halTextPage
+                              Nothing
                               Nothing
                               
-        let gReader = HGReader gReaderFun
-                               halToolbarST
+        let gReader = HGReader halToolbarST
                                halSymListST
-                               halCommConsole
                                halEditorPaned
+                               window
+                               notebook
+                               sourceview
         
         return (gReader,gState)
 
@@ -105,6 +98,7 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
         proofOFButton   <- builderGetObject xml castToToolButton "proofOHFileButton"
         compileMButton  <- builderGetObject xml castToToolButton "compileHModuleButton"
         symFButton      <- builderGetObject xml castToToggleToolButton "symHFrameButton"
+        axiomFButton      <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
         
         onToolButtonClicked newFButton      (eval createNewFile content st)
         onToolButtonClicked openFButton     (eval openFile content st)
@@ -143,6 +137,14 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
 eval :: GuiMonad () -> HGReader -> HGStateRef -> IO ()
 eval action content str = evalRWST action content str >> return ()
 
--- | Mensaje de error en caso de no encontrar el archivo glade correspondiente.
-msgErrGladeNotFound :: String
-msgErrGladeNotFound = "Archivo fun.glade no encontrado"
+
+-- | Configura la ventana principal.
+configWindow :: GuiMonad ()
+configWindow = ask >>= \content -> 
+            io $ do
+            let window = content ^. gHalWindow
+            windowMaximize window
+            widgetShowAll window
+            onDestroy window mainQuit
+            return ()
+

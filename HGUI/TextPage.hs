@@ -21,8 +21,8 @@ import HGUI.Config
 import HGUI.Utils
 
 -- Configura el lenguaje para el sourceView.
-configLanguage :: SourceBuffer -> GuiMonad ()
-configLanguage buf = io $ do
+configLanguage :: SourceBuffer -> IO ()
+configLanguage buf = do
     -- Language Spec
     slm <- sourceLanguageManagerNew
     path <- sourceLanguageManagerGetSearchPath slm
@@ -43,12 +43,12 @@ configLanguage buf = io $ do
             -- Style Scheme
             stm <- sourceStyleSchemeManagerNew
             sourceStyleSchemeManagerSetSearchPath stm (Just [textStylesFolder])
-            styleSch <- sourceStyleSchemeManagerGetScheme stm "fun"        
+            styleSch <- sourceStyleSchemeManagerGetScheme stm "lisa"        
             sourceBufferSetStyleScheme buf (Just styleSch)
 
 -- | Configuración del sourceView.
-configSourceView :: SourceView -> GuiMonad ()
-configSourceView sv = io $ do
+configSourceView :: SourceView -> IO ()
+configSourceView sv = do
         sourceViewSetIndentWidth sv funIdentWidth
         sourceViewSetAutoIndent sv autoIdent
         sourceViewSetIndentOnTab sv setIndentOnTab
@@ -57,8 +57,8 @@ configSourceView sv = io $ do
         
 
 -- | Configuración de la ventana de scroll, que contiene el campo de texto.
-configScrolledWindow :: ScrolledWindow -> GuiMonad ()
-configScrolledWindow sw = io $
+configScrolledWindow :: ScrolledWindow -> IO ()
+configScrolledWindow sw = 
             set sw [ scrolledWindowHscrollbarPolicy := PolicyAutomatic 
                    , scrolledWindowVscrollbarPolicy := PolicyAlways
                    ]
@@ -72,58 +72,59 @@ configNotebook nb = io $
                    ]
 
 -- | Crea un campo de texto y lo llena, de ser posible, con el string.
-createTextEntry :: Maybe String -> GuiMonad SourceView
-createTextEntry mcode = do
-            hbox <- io $ hBoxNew False 0
-            buf <- io $ sourceBufferNew Nothing
+createSourceView :: IO SourceView
+createSourceView = do
+            hbox <- hBoxNew False 0
+            buf <- sourceBufferNew Nothing
             configLanguage buf
             
-            maybe (return ()) (io . loadCode buf) mcode
-            
-            sourceview <- io $ sourceViewNewWithBuffer buf
+            sourceview <- sourceViewNewWithBuffer buf
 
             configSourceView sourceview
             
             return sourceview
-    where
-        loadCode :: TextBufferClass tbuffer => tbuffer -> String -> IO ()
-        loadCode buf code = do
-                start <- textBufferGetStartIter buf
-                textBufferInsert buf start code
 
--- | Crea un campo de texto con su respectivo scrollWindow.
-createTextEdit :: Maybe String -> GuiMonad ScrolledWindow
-createTextEdit mcode = do
+            
+configTextCode :: GuiMonad ()
+configTextCode = ask >>= \content ->
+        do
             swindow <- io $ scrolledWindowNew Nothing Nothing
-            configScrolledWindow swindow
+            io $ configScrolledWindow swindow
                         
-            texte <- createTextEntry mcode
+            let texte = content ^. gTextCode
             
             io $  containerAdd swindow texte
             
-            io $ widgetShowAll texte
+            let notebook = content ^. gHalNotebook
             
-            io $ widgetShowAll swindow
+            Just abox <- io $ notebookGetNthPage notebook 0
             
-            return swindow
+            let box = castToVBox abox
+            
+            io $ containerAdd box swindow
+            
+            io $ widgetShowAll box
+
+            
+
 
 -- | Crea un editBook, el cual tiene un primer campo de texto con nombre 
 -- y contenido de ser posible.
 createTextPage :: Maybe String -> GuiMonad ()
 createTextPage mcode = ask >>= \content -> do
             
-            texte <- createTextEdit mcode
+            let textcode = content ^. gTextCode
             
-            let editorPaned = content ^. (gHalEditorPaned . epaned)
+            -- borramos el código viejo:
+            tbuf <- io $ textViewGetBuffer textcode
             
-            Just da <- io $ panedGetChild1 editorPaned
+            start <- io $ textBufferGetStartIter tbuf
+            end   <- io $ textBufferGetEndIter tbuf
+            io $ textBufferDelete tbuf start end
             
-            io $ containerRemove editorPaned da
-            
-            io $ panedAdd1 editorPaned texte
-            io $ widgetShowAll editorPaned
-            
-            return ()
+            maybe (return ())
+                  (io . textBufferInsert tbuf start)
+                  mcode
 
 configTextPage :: GuiMonad ()
 configTextPage = createTextPage Nothing

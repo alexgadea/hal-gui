@@ -22,6 +22,7 @@ import qualified Data.Strict.Either as SEither
 
 import qualified Hal.Evaluation.Eval as HEval
 import Hal.Interpreter.Interpreter
+import Hal.Lang(Program)
 
 type TextFilePath = Text
 
@@ -38,20 +39,15 @@ data HalSymList = HalSymList { _gSymFrame    :: Frame
                              }
 $(mkLenses ''HalSymList)
 
-data HalCommConsole = HalCommConsole { _commEntry       :: Entry
-                                     , _commTBuffer     :: TextBuffer
-                                     , _commTView       :: TextView
-                                     }
-$(mkLenses ''HalCommConsole)
-
 data HalEditorPaned = HalEditorPaned { _epaned :: VPaned }
 $(mkLenses ''HalEditorPaned)
 
-data HGReader = HGReader { _gFunGReader         :: GStateFun.GReader 
-                         , _gHalToolbar         :: HalToolbar
+data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gHalSymbolList      :: HalSymList
-                         , _gHalCommConsole     :: HalCommConsole
                          , _gHalEditorPaned     :: HalEditorPaned
+                         , _gHalWindow          :: Window
+                         , _gHalNotebook        :: Notebook
+                         , _gTextCode           :: SourceView
                          }
 $(mkLenses ''HGReader)
 
@@ -64,9 +60,9 @@ $(mkLenses ''HalTextPage)
 -- | Tipo de mónada de estado, llevamos el environment de un modulo bien 
 -- chequeado y la info sobre la parte derecha de la interfaz, es decir, 
 -- la que contiene los campos de texto para escribir programas.
-data HGState = HGState { _gFunGState         :: GStateFun.GStateRef 
-                       , _gHalTextPage       :: HalTextPage
+data HGState = HGState { _gHalTextPage       :: HalTextPage
                        , _gHalConsoleState   :: Maybe IState
+                       , _gHalPrg :: Maybe Program
                        }
 $(mkLenses ''HGState)
 
@@ -77,7 +73,6 @@ type HGStateRef = IORef HGState
 type GuiMonad' = RWST HGReader () HGStateRef 
 type GuiMonad = GuiMonad' IO
 
-gHalWindow = gFunGReader . GStateFun.gFunWindow
 
 instance Reference IORef (StateT HEval.State IO) where
     newRef = liftIO . newRef
