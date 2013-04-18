@@ -1,4 +1,9 @@
-module HGUI.Console (configConsoleTV,printInfoMsg, printErrorMsg) where
+module HGUI.Console ( configInfoConsole
+                    , printInfoMsg
+                    , printErrorMsg
+                    , printInfoMsgIO
+                    , printErrorMsgIO
+                    ) where
 
 import Control.Monad.Trans.RWS (ask)
 
@@ -29,15 +34,32 @@ configConsoleTV tv  = do
         widgetModifyText tv StateNormal textColorCommTV
         widgetShowAll tv        
 
-printInfoMsg :: String -> TextView -> IO ()
-printInfoMsg msg = printMsg msg "InfoScheme"
-                
-printErrorMsg :: String -> TextView -> IO ()
-printErrorMsg msg = printMsg msg "ErrorScheme"
+configInfoConsole :: GuiMonad ()
+configInfoConsole = ask >>= \content -> io $ do
+                    let infoTV = content ^. gInfoConsole
+                    configConsoleTV infoTV
 
-printMsg :: String -> TagName -> TextView -> IO ()
-printMsg msg tagname infoTV  =
-    io $ do infoBuf <- textViewGetBuffer infoTV
+printInfoMsg :: String -> GuiMonad ()
+printInfoMsg = printMsg "InfoScheme"
+                
+printErrorMsg :: String -> GuiMonad ()
+printErrorMsg = printMsg "ErrorScheme"
+
+printInfoMsgIO :: String -> TextView -> IO ()
+printInfoMsgIO = printMsg' "InfoScheme"
+                
+printErrorMsgIO :: String -> TextView -> IO ()
+printErrorMsgIO = printMsg' "ErrorScheme"
+
+printMsg :: TagName -> String -> GuiMonad ()
+printMsg tagname msg = ask >>= \content -> io $ do 
+                       let infoTV = content ^. gInfoConsole
+                       printMsg' tagname msg infoTV
+
+printMsg' :: TagName -> String -> TextView -> IO ()
+printMsg' tagname msg infoTV = do
+            infoBuf <- textViewGetBuffer infoTV
+
             titer <- textBufferGetEndIter infoBuf
             lineStart <- textIterGetLine titer
                 

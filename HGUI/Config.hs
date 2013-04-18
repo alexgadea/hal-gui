@@ -23,8 +23,6 @@ textStyleFileHal = textStylesFolder ++ "/hal.xml"
 
 halMimeType = "text/hal"
 
-
-
 data LangInfo = LangInfo {
                     specFile :: String
                   , styleFile :: String
@@ -35,6 +33,9 @@ data LangInfo = LangInfo {
 funLangInfo = LangInfo languageSpecFunFile textStyleFileFun funMimeType "fun"
 
 halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "hal"
+
+breakMark :: String
+breakMark = "break"
 
 -- Para el identado:
 

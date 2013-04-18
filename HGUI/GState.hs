@@ -20,15 +20,18 @@ import Data.Reference
 import Data.Text (Text)
 import qualified Data.Strict.Either as SEither
 
-import qualified Hal.Evaluation.Eval as HEval
-import Hal.Interpreter.Interpreter
-import Hal.Lang(Program)
+import qualified Hal.Evaluation.EvalLang as HEval
+
+import HGUI.Evaluation.Eval
+import HGUI.ExtendedLang (ExtProgram)
 
 type TextFilePath = Text
 
 -- | Información sobre los items del toolBar.
-data HalToolbar = HalToolbar { _symFrameB :: ToggleToolButton
-                             , _axFrameB  :: ToggleToolButton}
+data HalToolbar = HalToolbar { _symFrameB  :: ToggleToolButton
+                             , _axFrameB   :: ToggleToolButton
+                             , _evalButton :: ToggleToolButton
+                             }
 $(mkLenses ''HalToolbar)
 
 -- | Información sobre la lista de símbolos.
@@ -41,16 +44,25 @@ data HalSymList = HalSymList { _gSymFrame    :: Frame
 $(mkLenses ''HalSymList)
 
 -- | Información sobre la lista de axiomas.
-data HalAxList = HalAxList { _gAxFrame    :: Frame 
-                           , _gAxTreeView :: TreeView
-                           , _gAxRel      :: ComboBox
+data HalAxList = HalAxList { _gAxFrame     :: Frame 
+                           , _gAxTreeView  :: TreeView
+                           , _gAxRel       :: ComboBox
                            , _gAxLabelExpr :: Label
                            }
 $(mkLenses ''HalAxList)
 
-data HalInfoConsole = HalInfoConsole { _infoConTView :: TextView
-                                     }
+data HalInfoConsole = HalInfoConsole { _infoConTView :: TextView }
 $(mkLenses ''HalInfoConsole)
+
+data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
+                                     , _cEvalLabel     :: Label
+                                     , _cStepButton    :: Button
+                                     , _cContButton    :: Button
+                                     , _cBreakButton   :: Button
+                                     , _cRestartButton :: Button
+                                     , _cCleanButton   :: Button
+                                     }
+$(mkLenses ''HalCommConsole)
 
 data HalEditorPaned = HalEditorPaned { _epaned :: VPaned }
 $(mkLenses ''HalEditorPaned)
@@ -64,6 +76,8 @@ data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gHalNotebook        :: Notebook
                          , _gTextCode           :: SourceView
                          , _gTextVerif          :: SourceView
+                         , _gInfoConsole        :: TextView
+                         , _gHalCommConsole     :: HalCommConsole
                          }
 $(mkLenses ''HGReader)
 
@@ -77,8 +91,8 @@ $(mkLenses ''HalTextPage)
 -- chequeado y la info sobre la parte derecha de la interfaz, es decir, 
 -- la que contiene los campos de texto para escribir programas.
 data HGState = HGState { _gHalTextPage       :: HalTextPage
-                       , _gHalConsoleState   :: Maybe IState
-                       , _gHalPrg            :: Maybe Program
+                       , _gHalConsoleState   :: Maybe ExecState
+                       , _gHalPrg            :: Maybe ExtProgram
                        , _gCurrentText       :: SourceView
                        , _gFileName          :: Maybe FilePath
                        }

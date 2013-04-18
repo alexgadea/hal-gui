@@ -54,7 +54,9 @@ configSourceView sv = do
         sourceViewSetIndentOnTab sv setIndentOnTab
         sourceViewSetInsertSpacesInsteadOfTabs sv spacesInsteadTab
         sourceViewSetShowLineNumbers sv True
-        
+        sourceViewSetShowLineMarks sv True
+        sourceViewSetHighlightCurrentLine sv True
+        sourceViewSetMarkCategoryIconFromStock sv breakMark (Just stockMediaRecord)
 
 -- | Configuración de la ventana de scroll, que contiene el campo de texto.
 configScrolledWindow :: ScrolledWindow -> IO ()

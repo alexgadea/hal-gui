@@ -8,13 +8,10 @@ import Data.Reference
 import Lens.Family
 import Lens.Family.TH
 
--- Import de la interfaz de fun como libreria.
--- import qualified GUI.Gui as GuiFun (mainFunGui)
--- import qualified GUI.GState as GStateFun (GReader,GStateRef)
-
 import HGUI.TextPage
 import HGUI.File
 import HGUI.Console
+import HGUI.EvalConsole
 import HGUI.GState
 import HGUI.SymbolList
 import HGUI.AxiomList
@@ -38,10 +35,13 @@ mainHalGui xml = do
                 runRWST (do configWindow
                             configTextCode
                             configTextVerif
-                            configMenuBarButtons  xml
+                            configMenuBarButtons xml
+                            configToolBarButtons xml
+                            configInfoConsole
                             configSymbolList
                             configAxiomList
                             eventsNotebook
+                            configEvalConsole
                          ) gReader gState
 
                 return ()
@@ -72,17 +72,30 @@ makeGState xml = do
 
         infoTV <- builderGetObject xml castToTextView "infoConsoleTView"
         
-        configConsoleTV infoTV
+        evalBox  <- builderGetObject xml castToVBox "evalBox"
+        evalL    <- builderGetObject xml castToLabel "evalLabel"
+        evalB    <- builderGetObject xml castToToggleToolButton "evalButton"
+        
+        stepB    <- builderGetObject xml castToButton "stepButton"
+        contB    <- builderGetObject xml castToButton "contButton"
+        breakB   <- builderGetObject xml castToButton "breakButton"
+        restartB <- builderGetObject xml castToButton "restartButton"
+        cleanB   <- builderGetObject xml castToButton "cleanButton"
+        
+        evalBox  <- builderGetObject xml castToVBox "evalBox"
+        evalL    <- builderGetObject xml castToLabel "evalLabel"
+        evalB    <- builderGetObject xml castToToggleToolButton "evalButton"
         
         textcode <- createSourceView halLangInfo
         
         textverif <- createSourceView funLangInfo
         
-        let halToolbarST   = HalToolbar symFrameB axFrameB
+        let halToolbarST   = HalToolbar symFrameB axFrameB evalB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
             halTextPage    = HalTextPage Nothing False
+            halCommConsole = HalCommConsole evalBox evalL stepB contB breakB restartB cleanB
         
         gState <- newRef $ 
                       HGState halTextPage
@@ -100,12 +113,13 @@ makeGState xml = do
                                notebook
                                textcode
                                textverif
-        
+                               infoTV
+                               halCommConsole
         return (gReader,gState)
 
 -- | Configura los botones de la barra, tales como abrir, cerrar, etc...
-configMenuBarButtons :: Builder -> GuiMonad ()
-configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
+configToolBarButtons :: Builder -> GuiMonad ()
+configToolBarButtons xml = ask >>= \content -> get >>= \st ->
         io $ do
         
         newFButton      <- builderGetObject xml castToToolButton "newHFileButton"
@@ -114,8 +128,9 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
         saveAtFButton   <- builderGetObject xml castToToolButton "saveHFileAtButton"
         proofOFButton   <- builderGetObject xml castToToolButton "proofOHFileButton"
         compileMButton  <- builderGetObject xml castToToolButton "compileHModuleButton"
+        evalButton      <- builderGetObject xml castToToggleToolButton "evalButton"
         symFButton      <- builderGetObject xml castToToggleToolButton "symHFrameButton"
-        axiomFButton      <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
+        axiomFButton    <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
         
         onToolButtonClicked newFButton      (eval createNewFile content st)
         onToolButtonClicked openFButton     (eval openFile content st)
@@ -123,35 +138,30 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
         onToolButtonClicked saveAtFButton   (eval saveAtFile content st)
         onToolButtonClicked proofOFButton   (eval genProofObligations content st)
         onToolButtonClicked compileMButton  (eval compile content st)
+        onToolButtonClicked evalButton      (eval configEvalButton content st)
         onToolButtonClicked symFButton      (eval configSymFrameButton content st)
         onToolButtonClicked axiomFButton    (eval configAxFrameButton content st)
         
         return ()
--- 
--- -- | Configura los botones del menude archivo.
--- configToolBarButtons :: Builder -> GuiMonad ()
--- configToolBarButtons xml = ask >>= \content -> get >>= \st ->
---             io $ do
---             let window = content ^. gFunWindow
---             newB  <- builderGetObject xml castToMenuItem "newButton"
---             openB <- builderGetObject xml castToMenuItem "openButton"
---             saveB  <- builderGetObject xml castToMenuItem "saveButton"
---             saveAsB <- builderGetObject xml castToMenuItem "saveAsButton"
---             closeB  <- builderGetObject xml castToMenuItem "closeButton"
---             quitB  <- builderGetObject xml castToMenuItem "quitButton"
---             
---             checkB <- builderGetObject xml castToMenuItem "checkButton"
---             
---             onActivateLeaf newB   $ eval createNewFile    content st
---             onActivateLeaf openB   $ eval openFile    content st
---             onActivateLeaf saveB  $ eval saveFile         content st
---             onActivateLeaf saveAsB  $ eval saveAtFile         content st
---             onActivateLeaf closeB $ eval closeCurrentFile content st
---             onActivateLeaf quitB  $ widgetDestroy window
---             
---             onActivateLeaf checkB $ eval checkSelectFile content st
---             return ()
 
+configMenuBarButtons :: Builder -> GuiMonad ()
+configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
+            io $ do
+            let window = content ^. gHalWindow
+            
+            newB    <- builderGetObject xml castToMenuItem "newButton"
+            openB   <- builderGetObject xml castToMenuItem "openButton"
+            saveB   <- builderGetObject xml castToMenuItem "saveButton"
+            saveAsB <- builderGetObject xml castToMenuItem "saveAsButton"
+            quitB   <- builderGetObject xml castToMenuItem "quitButton"
+            
+            onActivateLeaf newB    $ eval createNewFile    content st
+            onActivateLeaf openB   $ eval openFile    content st
+            onActivateLeaf saveB   $ eval saveFile         content st
+            onActivateLeaf saveAsB $ eval saveAtFile         content st
+            onActivateLeaf quitB   $ widgetDestroy window
+            
+            return ()
 
 -- | Configura la ventana principal.
 configWindow :: GuiMonad ()
@@ -176,4 +186,3 @@ eventsNotebook = ask >>= \content ->
                         then eval (updateHGState ((<~) gCurrentText textcode)) content st
                         else eval (updateHGState ((<~) gCurrentText textverif)) content st)
         return ()
-    

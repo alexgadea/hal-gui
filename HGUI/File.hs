@@ -15,15 +15,18 @@ import System.FilePath.Posix
 import Data.Maybe (fromMaybe,isJust,fromJust)
 import Data.Text hiding (take,init,drop)
 
+import HGUI.Console
 import HGUI.GState
 import HGUI.TextPage
 import HGUI.Utils
 import HGUI.Console
+import HGUI.Parser(parseExtPrgFromString)
 
-import Hal.Parser(parseFromString)
-import Hal.Verification.WeakPre(generateFunFileString)
+   --import Hal.Verification.WeakPre(generateFunFileString)
 
 import Lens.Family
+
+generateFunFileString a s = return "ja ja"
 
 -- | En general, salvo aclaración, un archivo en este contexto es directamente
 -- un campo de texto con su respectivo nombre en la interfaz.
@@ -50,11 +53,10 @@ genProofObligations = ask >>= \content -> getHGState >>= \st ->
     do
         let mprg = st ^. gHalPrg
         let mfile = st ^. gFileName
-        let infotv = content ^. (gHalInfoConsole . infoConTView)
         
         maybe compile
               (\prg ->
-                maybe (io $ printErrorMsg "El archivo no está guardado" infotv)
+                maybe (printErrorMsg "El archivo no está guardado")
                       (\fname -> io (generateFunFileString fname prg) >>=
                        \strfun -> createTextFunPage strfun)
                       mfile)
@@ -171,22 +173,13 @@ compile = get >>= \st -> ask >>= \content ->
               (\fp -> io $ C.catch (readFile fp >>= \code ->
                                     eval (parseCode consoleTV code) content st)
                       (\e -> let err = show (e :: C.IOException)  in
-                             printErrorMsg ("Error leyendo archivo:\n" ++err) consoleTV)
+                             printErrorMsgIO ("Error leyendo archivo:\n" ++err) consoleTV)
                              )
               mfile
         
     where parseCode consoleTV code =
-            case parseFromString code of
-                Left er -> io $ printErrorMsg ("Error compilando código: " ++ show er) consoleTV
+            case parseExtPrgFromString code of
+                Left er -> io $ printErrorMsgIO ("Error compilando código: " ++ show er) consoleTV
                 Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
-                    io (printInfoMsg "Código compilado" consoleTV)
+                    io (printInfoMsgIO "Código compilado" consoleTV)
 
-getCode :: GuiMonad String
-getCode = ask >>= \content -> 
-          getHGState >>= \st -> io $ 
-        do
-        let text = content ^. gTextCode
-        buf       <- textViewGetBuffer text
-        start     <- textBufferGetStartIter buf
-        end       <- textBufferGetEndIter buf
-        textBufferGetText buf start end False
