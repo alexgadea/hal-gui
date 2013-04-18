@@ -17,6 +17,7 @@ import HGUI.File
 import HGUI.Console
 import HGUI.GState
 import HGUI.SymbolList
+import HGUI.AxiomList
 import HGUI.Config
 
 main :: IO ()
@@ -39,7 +40,8 @@ mainHalGui xml = do
                             configTextVerif
                             configMenuBarButtons  xml
                             configSymbolList
-                            configNotebook
+                            configAxiomList
+                            eventsNotebook
                          ) gReader gState
 
                 return ()
@@ -55,6 +57,12 @@ makeGState xml = do
         scrollW    <- builderGetObject xml castToScrolledWindow "swSymbolList"
         symIV      <- builderGetObject xml castToIconView "symbolList"
         goRightBox <- builderGetObject xml castToHBox "symGoRightBox"
+        
+        axFrame  <- builderGetObject xml castToFrame "axiomFrame"
+        axTV     <- builderGetObject xml castToTreeView "axiomList"
+        axRel    <- builderGetObject xml castToComboBox "comboAxioms"
+        axFrameB <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
+        axLabExpr <- builderGetObject xml castToLabel "axiomExpr"
 
         edPaned <- builderGetObject xml castToVPaned "edPaned"
         
@@ -64,16 +72,15 @@ makeGState xml = do
 
         infoTV <- builderGetObject xml castToTextView "infoConsoleTView"
         
-        infoTBuf <- textViewGetBuffer infoTV
-        
-        configConsoleTV infoTV infoTBuf
+        configConsoleTV infoTV
         
         textcode <- createSourceView halLangInfo
         
         textverif <- createSourceView funLangInfo
         
-        let halToolbarST   = HalToolbar symFrameB
+        let halToolbarST   = HalToolbar symFrameB axFrameB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
+            halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
             halTextPage    = HalTextPage Nothing False
         
@@ -81,15 +88,18 @@ makeGState xml = do
                       HGState halTextPage
                               Nothing
                               Nothing
+                              textcode
+                              Nothing
                               
         let gReader = HGReader halToolbarST
                                halSymListST
+                               halAxListST
                                halEditorPaned
                                window
+                               (HalInfoConsole infoTV)
                                notebook
                                textcode
                                textverif
-                               textcode
         
         return (gReader,gState)
 
@@ -114,6 +124,7 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
         onToolButtonClicked proofOFButton   (eval genProofObligations content st)
         onToolButtonClicked compileMButton  (eval compile content st)
         onToolButtonClicked symFButton      (eval configSymFrameButton content st)
+        onToolButtonClicked axiomFButton    (eval configAxFrameButton content st)
         
         return ()
 -- 
@@ -140,9 +151,6 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
 --             
 --             onActivateLeaf checkB $ eval checkSelectFile content st
 --             return ()
-            
-eval :: GuiMonad () -> HGReader -> HGStateRef -> IO ()
-eval action content str = evalRWST action content str >> return ()
 
 
 -- | Configura la ventana principal.
@@ -155,9 +163,17 @@ configWindow = ask >>= \content ->
             onDestroy window mainQuit
             return ()
 
-configNotebook :: GuiMonad ()
-configNotebook = return ()
-    
-    
-    
+eventsNotebook :: GuiMonad ()
+eventsNotebook = ask >>= \content ->
+                 get >>= \st ->
+    do
+        let notebook = content ^. gHalNotebook
+        let textcode = content ^. gTextCode
+        let textverif = content ^. gTextVerif
+        
+        io (notebook `on` switchPage $
+                \i -> if i == 0
+                        then eval (updateHGState ((<~) gCurrentText textcode)) content st
+                        else eval (updateHGState ((<~) gCurrentText textverif)) content st)
+        return ()
     

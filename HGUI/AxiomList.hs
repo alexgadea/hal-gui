@@ -1,5 +1,5 @@
 -- | Configuración de la lista de axiomas.
-module GUI.AxiomList where
+module HGUI.AxiomList where
 
 import Equ.Proof (Basic(..),Truth (..)) 
 import Equ.Rule (Relation,relRepr)
@@ -7,6 +7,7 @@ import Equ.Theories (relationList)
 import qualified Equ.Theories as ET (axiomGroup,Grouped,toForest) 
 
 import Graphics.UI.Gtk hiding (eventButton, eventSent,get)
+import Graphics.UI.Gtk.SourceView
 
 import Data.Text(unpack,pack)
 import Data.Tree
@@ -39,8 +40,8 @@ listAxioms = treeStoreNew $ forest ET.axiomGroup ++ forest eval
 configAxFrameButton :: GuiMonad ()
 configAxFrameButton = do
                 content <-  ask
-                let af          = content ^. (gFunAxiomList . gAxFrame)
-                let afButton    = content ^. (gFunToolbar . axFrameB)
+                let af          = content ^. (gHalAxList . gAxFrame)
+                let afButton    = content ^. (gHalToolbar . axFrameB)
                 
                 active <- io $ toggleToolButtonGetActive afButton
                 if active 
@@ -51,9 +52,9 @@ configAxFrameButton = do
 configAxiomList :: GuiMonad ()
 configAxiomList = do
             content <- ask
-            let af  = content ^. (gFunAxiomList . gAxFrame)
-            let tv  = content ^. (gFunAxiomList . gAxTreeView)
-            let axr = content ^. (gFunAxiomList . gAxRel)
+            let af  = content ^. (gHalAxList . gAxFrame)
+            let tv  = content ^. (gHalAxList . gAxTreeView)
+            let axr = content ^. (gHalAxList . gAxRel)
             
             list <- io relationListStore
             setupComboRel axr list
@@ -97,22 +98,21 @@ eventsAxiomList tv list =
 
 putOnText :: TreeStore AxiomItem -> TreePath -> GuiMonad ()
 putOnText list path = 
-        unless (length path == 1) $ getGState >>= \st ->
-            return (st ^. gFunEditBook) >>= \mEditBook ->
-            maybe (return ()) (configSelection path) mEditBook
+        unless (length path == 1) $ getHGState >>= \st ->
+            return (st ^. gCurrentText) >>= \tv ->
+            configSelection path tv
     where
         justification :: [Relation] -> Int -> String -> String
         justification rs i j = (unpack $ relRepr (rs!!i)) ++ " { " ++ j ++ " }"
-        configSelection :: TreePath -> FunEditBook -> GuiMonad ()
-        configSelection path editBook = ask >>= \content -> 
-                return (content ^. (gFunAxiomList . gAxRel)) >>= \axRel ->
-                getTextEditFromFunEditBook editBook >>= \(_,_,tv) ->
+        configSelection :: TreePath -> SourceView -> GuiMonad ()
+        configSelection path tv = ask >>= \content -> 
+                return (content ^. (gHalAxList . gAxRel)) >>= \axRel ->
                 io (treeStoreGetValue list path) >>= \(ax,_) ->
                 io (relationListStore) >>= \lsrel ->
                 io (listStoreToList lsrel) >>= \l ->
                 io (comboBoxGetActive axRel) >>= \i ->
                 addToCursorBuffer tv $ justification l i ax
-        addToCursorBuffer :: TextView -> String -> GuiMonad ()
+        addToCursorBuffer :: SourceView -> String -> GuiMonad ()
         addToCursorBuffer tv repr = io $ do
                 buf <- textViewGetBuffer tv
                 textBufferInsertAtCursor buf repr
@@ -123,7 +123,7 @@ showAxiom list tree = io (treeSelectionGetSelectedRows tree) >>= \sel ->
             unless (null sel) $ return (head sel) >>= \h ->
             unless (length h == 1) $ 
             ask >>= \content -> 
-            return (content ^. (gFunAxiomList . gAxLabelExpr)) >>= \lab ->
+            return (content ^. (gHalAxList . gAxLabelExpr)) >>= \lab ->
             io (treeStoreGetValue list h >>= \(_,Just basic) ->
             labelSetText lab (show $ truthExpr basic))
 

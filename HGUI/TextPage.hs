@@ -126,8 +126,6 @@ configTextVerif = ask >>= \content ->
             io $ widgetShowAll box
 
 
--- | Crea un editBook, el cual tiene un primer campo de texto con nombre 
--- y contenido de ser posible.
 createTextPage :: Maybe String -> GuiMonad ()
 createTextPage mcode = ask >>= \content -> do
             
@@ -143,6 +141,22 @@ createTextPage mcode = ask >>= \content -> do
             maybe (return ())
                   (io . textBufferInsert tbuf start)
                   mcode
+                  
+createTextFunPage :: String -> GuiMonad ()
+createTextFunPage code = ask >>= \content -> do
+            
+            let textverif = content ^. gTextVerif
+            
+            -- borramos el código viejo:
+            tbuf <- io $ textViewGetBuffer textverif
+            
+            start <- io $ textBufferGetStartIter tbuf
+            end   <- io $ textBufferGetEndIter tbuf
+            io $ textBufferDelete tbuf start end
+            
+            io $ textBufferInsert tbuf start code
+
+
 
 configTextPage :: GuiMonad ()
 configTextPage = createTextPage Nothing

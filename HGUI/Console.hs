@@ -10,8 +10,9 @@ import HGUI.Config
 import HGUI.GState
 import HGUI.Utils
 
-configConsoleTV :: TextView -> TextBuffer -> IO ()
-configConsoleTV tv buf = do
+configConsoleTV :: TextView ->  IO ()
+configConsoleTV tv  = do
+        buf <- textViewGetBuffer tv
         -- Tags para el text buffer, para formatear texto:
         tagTable <- textBufferGetTagTable buf
         tag <- textTagNew (Just "ErrorScheme")
@@ -28,15 +29,16 @@ configConsoleTV tv buf = do
         widgetModifyText tv StateNormal textColorCommTV
         widgetShowAll tv        
 
-printInfoMsg :: String -> TextBuffer -> TextView -> IO ()
+printInfoMsg :: String -> TextView -> IO ()
 printInfoMsg msg = printMsg msg "InfoScheme"
                 
-printErrorMsg :: String -> TextBuffer -> TextView -> IO ()
+printErrorMsg :: String -> TextView -> IO ()
 printErrorMsg msg = printMsg msg "ErrorScheme"
 
-printMsg :: String -> TagName -> TextBuffer -> TextView -> IO ()
-printMsg msg tagname infoBuf infoTV  =
-    io $ do titer <- textBufferGetEndIter infoBuf
+printMsg :: String -> TagName -> TextView -> IO ()
+printMsg msg tagname infoTV  =
+    io $ do infoBuf <- textViewGetBuffer infoTV
+            titer <- textBufferGetEndIter infoBuf
             lineStart <- textIterGetLine titer
                 
             -- Ingresamos el texto en el buffer

@@ -27,7 +27,8 @@ import Hal.Lang(Program)
 type TextFilePath = Text
 
 -- | Información sobre los items del toolBar.
-data HalToolbar = HalToolbar { _symFrameB :: ToggleToolButton }
+data HalToolbar = HalToolbar { _symFrameB :: ToggleToolButton
+                             , _axFrameB  :: ToggleToolButton}
 $(mkLenses ''HalToolbar)
 
 -- | Información sobre la lista de símbolos.
@@ -39,17 +40,30 @@ data HalSymList = HalSymList { _gSymFrame    :: Frame
                              }
 $(mkLenses ''HalSymList)
 
+-- | Información sobre la lista de axiomas.
+data HalAxList = HalAxList { _gAxFrame    :: Frame 
+                           , _gAxTreeView :: TreeView
+                           , _gAxRel      :: ComboBox
+                           , _gAxLabelExpr :: Label
+                           }
+$(mkLenses ''HalAxList)
+
+data HalInfoConsole = HalInfoConsole { _infoConTView :: TextView
+                                     }
+$(mkLenses ''HalInfoConsole)
+
 data HalEditorPaned = HalEditorPaned { _epaned :: VPaned }
 $(mkLenses ''HalEditorPaned)
 
 data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gHalSymbolList      :: HalSymList
+                         , _gHalAxList          :: HalAxList
                          , _gHalEditorPaned     :: HalEditorPaned
                          , _gHalWindow          :: Window
+                         , _gHalInfoConsole     :: HalInfoConsole
                          , _gHalNotebook        :: Notebook
                          , _gTextCode           :: SourceView
                          , _gTextVerif          :: SourceView
-                         , _gCurrentText        :: SourceView
                          }
 $(mkLenses ''HGReader)
 
@@ -64,7 +78,9 @@ $(mkLenses ''HalTextPage)
 -- la que contiene los campos de texto para escribir programas.
 data HGState = HGState { _gHalTextPage       :: HalTextPage
                        , _gHalConsoleState   :: Maybe IState
-                       , _gHalPrg :: Maybe Program
+                       , _gHalPrg            :: Maybe Program
+                       , _gCurrentText       :: SourceView
+                       , _gFileName          :: Maybe FilePath
                        }
 $(mkLenses ''HGState)
 
@@ -104,3 +120,6 @@ updateHGState f = do
                 put r
 
 io = liftIO
+
+eval :: GuiMonad () -> HGReader -> HGStateRef -> IO ()
+eval action content str = evalRWST action content str >> return ()

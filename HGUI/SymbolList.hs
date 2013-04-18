@@ -129,9 +129,10 @@ eventsSymbolList iv list = do
             return ()
 
 oneSelection :: ListStore SymItem -> TreePath -> GuiMonad ()
-oneSelection list path = ask >>= \content -> 
+oneSelection list path = ask >>= \content ->
+                         getHGState >>= \st ->
             do
-                let sv = content ^. gCurrentText 
+                let sv = st ^. gCurrentText 
                 el <- io (getElem list path)
                 F.mapM_ (addToCursorBuffer sv) el
     where

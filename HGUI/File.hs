@@ -8,6 +8,7 @@ import Control.Monad
 
 import Control.Concurrent
 import Control.Concurrent.STM
+import qualified Control.Exception as C
 
 import qualified Data.Foldable as F
 import System.FilePath.Posix
@@ -17,8 +18,10 @@ import Data.Text hiding (take,init,drop)
 import HGUI.GState
 import HGUI.TextPage
 import HGUI.Utils
+import HGUI.Console
 
 import Hal.Parser(parseFromString)
+import Hal.Verification.WeakPre(generateFunFileString)
 
 import Lens.Family
 
@@ -32,6 +35,10 @@ createNewFileFromLoad mfp mcode = getHGState >>= \st -> ask >>= \content ->
         do
         unless (st ^. (gHalTextPage . isSave)) saveFile
         updateHGState ((<~) gHalTextPage (HalTextPage mfp True))
+        maybe (return ())
+              (\name -> updateHGState ((<~) gFileName (Just $ unpack name)))
+              mfp
+              
         createTextPage mcode
 
 -- | Crea un nuevo archivo en blanco.
@@ -39,7 +46,19 @@ createNewFile :: GuiMonad ()
 createNewFile = createNewFileFromLoad Nothing Nothing
 
 genProofObligations :: GuiMonad ()
-genProofObligations = return ()
+genProofObligations = ask >>= \content -> getHGState >>= \st ->
+    do
+        let mprg = st ^. gHalPrg
+        let mfile = st ^. gFileName
+        let infotv = content ^. (gHalInfoConsole . infoConTView)
+        
+        maybe compile
+              (\prg ->
+                maybe (io $ printErrorMsg "El archivo no está guardado" infotv)
+                      (\fname -> io (generateFunFileString fname prg) >>=
+                       \strfun -> createTextFunPage strfun)
+                      mfile)
+              mprg
 
 -- | Función para cargar un archivo.
 openFile :: GuiMonad ()
@@ -109,7 +128,8 @@ saveAtFile = getHGState >>= \st -> ask >>= \content ->
              return ()
     where
         updateFL :: FilePath -> GuiMonad ()
-        updateFL fp = updateHGState ((<~) gHalTextPage (HalTextPage (Just $ pack fp) True))
+        updateFL fp = updateHGState ((<~) gHalTextPage (HalTextPage (Just $ pack fp) True)) >>
+                      updateHGState ((<~) gFileName $ Just fp)
 
 -- | Dialogo general para guardar un archivo.
 saveDialog :: String -> String -> (FileChooserDialog -> IO ()) -> 
@@ -142,11 +162,31 @@ halFileFilter dialog = io $ setFileFilter dialog ["*.lisa"] "Programa de hal"
 
 
 compile :: GuiMonad ()
-compile = get >>= \ref -> ask >>= \content ->
+compile = get >>= \st -> ask >>= \content ->
+          getHGState >>= \gst ->
         do
-        code <- getCode
-        case parseFromString code of
-            Left er -> return ()
-            Right prg -> updateHGState ((<~) gHalPrg (Just prg))
+        let consoleTV = content ^. (gHalInfoConsole . infoConTView)
+            mfile = gst ^. gFileName
+        maybe saveAtFile
+              (\fp -> io $ C.catch (readFile fp >>= \code ->
+                                    eval (parseCode consoleTV code) content st)
+                      (\e -> let err = show (e :: C.IOException)  in
+                             printErrorMsg ("Error leyendo archivo:\n" ++err) consoleTV)
+                             )
+              mfile
+        
+    where parseCode consoleTV code =
+            case parseFromString code of
+                Left er -> io $ printErrorMsg ("Error compilando código: " ++ show er) consoleTV
+                Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
+                    io (printInfoMsg "Código compilado" consoleTV)
 
-
+getCode :: GuiMonad String
+getCode = ask >>= \content -> 
+          getHGState >>= \st -> io $ 
+        do
+        let text = content ^. gTextCode
+        buf       <- textViewGetBuffer text
+        start     <- textBufferGetStartIter buf
+        end       <- textBufferGetEndIter buf
+        textBufferGetText buf start end False
