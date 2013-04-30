@@ -22,11 +22,11 @@ import HGUI.Utils
 import HGUI.Console
 import HGUI.Parser(parseExtPrgFromString)
 
-   --import Hal.Verification.WeakPre(generateFunFileString)
+import Hal.Verification.WeakPre(generateFunFileString)
 
 import Lens.Family
 
-generateFunFileString a s = return "ja ja"
+-- generateFunFileString a s = return "ja ja"
 
 -- | En general, salvo aclaración, un archivo en este contexto es directamente
 -- un campo de texto con su respectivo nombre en la interfaz.

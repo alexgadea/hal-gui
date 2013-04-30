@@ -65,13 +65,6 @@ configScrolledWindow sw =
                    , scrolledWindowVscrollbarPolicy := PolicyAlways
                    ]
 
--- | Configuración del aspecto del notebook que contiene los archivos abiertos.
-configNotebook :: Notebook -> GuiMonad ()
-configNotebook nb = io $
-            set nb [ notebookTabBorder  := 0
-                   , notebookTabHborder := 0
-                   , notebookTabVborder := 0
-                   ]
 
 -- | Crea un campo de texto y lo llena, de ser posible, con el string.
 createSourceView :: LangInfo -> IO SourceView
@@ -87,45 +80,18 @@ createSourceView langi = do
             return sourceview
 
             
-configTextCode :: GuiMonad ()
-configTextCode = ask >>= \content ->
+configText :: VBox -> SourceView -> IO ()
+configText box sv = 
         do
-            swindow <- io $ scrolledWindowNew Nothing Nothing
-            io $ configScrolledWindow swindow
-                        
-            let texte = content ^. gTextCode
+            swindow <- scrolledWindowNew Nothing Nothing
+            configScrolledWindow swindow
             
-            io $  containerAdd swindow texte
+            containerAdd swindow sv
             
-            let notebook = content ^. gHalNotebook
+            containerAdd box swindow
             
-            Just abox <- io $ notebookGetNthPage notebook 0
-            
-            let box = castToVBox abox
-            
-            io $ containerAdd box swindow
-            
-            io $ widgetShowAll box
+            widgetShowAll box
 
-configTextVerif :: GuiMonad ()
-configTextVerif = ask >>= \content ->
-        do
-            swindow <- io $ scrolledWindowNew Nothing Nothing
-            io $ configScrolledWindow swindow
-                        
-            let textver = content ^. gTextVerif
-            
-            io $  containerAdd swindow textver
-            
-            let notebook = content ^. gHalNotebook
-            
-            Just abox <- io $ notebookGetNthPage notebook 1
-            
-            let box = castToVBox abox
-            
-            io $ containerAdd box swindow
-            
-            io $ widgetShowAll box
 
 
 createTextPage :: Maybe String -> GuiMonad ()

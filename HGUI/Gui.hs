@@ -33,14 +33,12 @@ mainHalGui xml = do
                 (gReader,gState) <- makeGState xml
 
                 runRWST (do configWindow
-                            configTextCode
-                            configTextVerif
                             configMenuBarButtons xml
                             configToolBarButtons xml
                             configInfoConsole
                             configSymbolList
                             configAxiomList
-                            eventsNotebook
+                            eventsSourceView
                             configEvalConsole
                          ) gReader gState
 
@@ -67,8 +65,6 @@ makeGState xml = do
         edPaned <- builderGetObject xml castToVPaned "edPaned"
         
         window <- builderGetObject xml castToWindow "mainWindow"
-        
-        notebook <- builderGetObject xml castToNotebook "notebook1"
 
         infoTV <- builderGetObject xml castToTextView "infoConsoleTView"
         
@@ -86,9 +82,14 @@ makeGState xml = do
         evalL    <- builderGetObject xml castToLabel "evalLabel"
         evalB    <- builderGetObject xml castToToggleToolButton "evalButton"
         
-        textcode <- createSourceView halLangInfo
+        boxLisa <- builderGetObject xml castToVBox "boxLisaCode"
+        boxFun  <- builderGetObject xml castToVBox "boxFunCode"
         
+        textcode <- createSourceView halLangInfo
         textverif <- createSourceView funLangInfo
+        
+        configText boxLisa textcode
+        configText boxFun textverif
         
         let halToolbarST   = HalToolbar symFrameB axFrameB evalB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
@@ -110,7 +111,6 @@ makeGState xml = do
                                halEditorPaned
                                window
                                (HalInfoConsole infoTV)
-                               notebook
                                textcode
                                textverif
                                infoTV
@@ -173,16 +173,20 @@ configWindow = ask >>= \content ->
             onDestroy window mainQuit
             return ()
 
-eventsNotebook :: GuiMonad ()
-eventsNotebook = ask >>= \content ->
-                 get >>= \st ->
+            
+eventsSourceView :: GuiMonad ()
+eventsSourceView = ask >>= \content ->
+                   get >>= \st ->
     do
-        let notebook = content ^. gHalNotebook
         let textcode = content ^. gTextCode
         let textverif = content ^. gTextVerif
+    
+        io (textcode `on` buttonPressEvent $ io $
+                eval (updateHGState ((<~) gCurrentText textcode)) content st >>
+                return False)
+                
+        io (textverif `on` buttonPressEvent $ io $
+                eval (updateHGState ((<~) gCurrentText textverif)) content st >>
+                return False)
         
-        io (notebook `on` switchPage $
-                \i -> if i == 0
-                        then eval (updateHGState ((<~) gCurrentText textcode)) content st
-                        else eval (updateHGState ((<~) gCurrentText textverif)) content st)
         return ()

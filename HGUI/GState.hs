@@ -73,7 +73,6 @@ data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gHalEditorPaned     :: HalEditorPaned
                          , _gHalWindow          :: Window
                          , _gHalInfoConsole     :: HalInfoConsole
-                         , _gHalNotebook        :: Notebook
                          , _gTextCode           :: SourceView
                          , _gTextVerif          :: SourceView
                          , _gInfoConsole        :: TextView
