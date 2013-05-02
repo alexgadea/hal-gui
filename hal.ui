@@ -368,6 +368,8 @@
                   <object class="GtkHPaned" id="paned1">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
+                    <property name="position">121</property>
+                    <property name="position_set">True</property>
                     <child>
                       <object class="GtkVBox" id="box12">
                         <property name="visible">True</property>
@@ -415,7 +417,7 @@
                         </child>
                       </object>
                       <packing>
-                        <property name="resize">False</property>
+                        <property name="resize">True</property>
                         <property name="shrink">True</property>
                       </packing>
                     </child>
