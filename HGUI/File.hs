@@ -19,14 +19,12 @@ import HGUI.Console
 import HGUI.GState
 import HGUI.TextPage
 import HGUI.Utils
-import HGUI.Console
+import HGUI.ExtendedLang
 import HGUI.Parser(parseExtPrgFromString)
 
-   --import Hal.Verification.WeakPre(generateFunFileString)
+import Hal.Verification.WeakPre(generateFunFileString)
 
 import Lens.Family
-
-generateFunFileString a s = return "ja ja"
 
 -- | En general, salvo aclaración, un archivo en este contexto es directamente
 -- un campo de texto con su respectivo nombre en la interfaz.
@@ -57,7 +55,7 @@ genProofObligations = ask >>= \content -> getHGState >>= \st ->
         maybe compile
               (\prg ->
                 maybe (printErrorMsg "El archivo no está guardado")
-                      (\fname -> io (generateFunFileString fname prg) >>=
+                      (\fname -> io (generateFunFileString fname $ convertExtProgToProg prg) >>=
                        \strfun -> createTextFunPage strfun)
                       mfile)
               mprg
