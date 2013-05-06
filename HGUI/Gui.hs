@@ -2,6 +2,9 @@ module HGUI.Gui where
 
 import Graphics.UI.Gtk hiding (get)
 
+import Control.Concurrent
+import Control.Concurrent.MVar
+
 import Control.Monad.Trans.RWS
 import Data.Reference
 
@@ -16,17 +19,8 @@ import HGUI.GState
 import HGUI.SymbolList
 import HGUI.AxiomList
 import HGUI.Config
-
-main :: IO ()
-main = do 
-    initGUI
-    
-    xml <- builderNew
-    builderAddFromFile xml "hal.ui"
-    
-    mainHalGui xml
-
-    mainGUI
+import HGUI.Evaluation.Eval
+import HGUI.Evaluation.EvalState
 
 mainHalGui :: Builder -> IO ()
 mainHalGui xml = do
@@ -68,19 +62,16 @@ makeGState xml = do
 
         infoTV <- builderGetObject xml castToTextView "infoConsoleTView"
         
-        evalBox  <- builderGetObject xml castToVBox "evalBox"
-        evalL    <- builderGetObject xml castToLabel "evalLabel"
-        evalB    <- builderGetObject xml castToToggleToolButton "evalButton"
+        evalBox      <- builderGetObject xml castToVBox "evalBox"
+        evalStateBox <- builderGetObject xml castToVBox "stateBox"
+        evalL        <- builderGetObject xml castToLabel "evalLabel"
+        evalB        <- builderGetObject xml castToToggleToolButton "evalButton"
         
         stepB    <- builderGetObject xml castToButton "stepButton"
         contB    <- builderGetObject xml castToButton "contButton"
         breakB   <- builderGetObject xml castToButton "breakButton"
         restartB <- builderGetObject xml castToButton "restartButton"
         cleanB   <- builderGetObject xml castToButton "cleanButton"
-        
-        evalBox  <- builderGetObject xml castToVBox "evalBox"
-        evalL    <- builderGetObject xml castToLabel "evalLabel"
-        evalB    <- builderGetObject xml castToToggleToolButton "evalButton"
         
         boxLisa <- builderGetObject xml castToVBox "boxLisaCode"
         boxFun  <- builderGetObject xml castToVBox "boxFunCode"
@@ -91,12 +82,15 @@ makeGState xml = do
         configText boxLisa textcode
         configText boxFun textverif
         
+        forkFlag <- newEmptyMVar
+        
         let halToolbarST   = HalToolbar symFrameB axFrameB evalB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
             halTextPage    = HalTextPage Nothing False
-            halCommConsole = HalCommConsole evalBox evalL stepB contB breakB restartB cleanB
+            halCommConsole = HalCommConsole evalBox evalStateBox evalL 
+                                            stepB contB breakB restartB cleanB
         
         gState <- newRef $ 
                       HGState halTextPage
@@ -115,6 +109,8 @@ makeGState xml = do
                                textverif
                                infoTV
                                halCommConsole
+                               forkFlag
+        
         return (gReader,gState)
 
 -- | Configura los botones de la barra, tales como abrir, cerrar, etc...
@@ -156,9 +152,9 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
             quitB   <- builderGetObject xml castToMenuItem "quitButton"
             
             onActivateLeaf newB    $ eval createNewFile    content st
-            onActivateLeaf openB   $ eval openFile    content st
+            onActivateLeaf openB   $ eval openFile         content st
             onActivateLeaf saveB   $ eval saveFile         content st
-            onActivateLeaf saveAsB $ eval saveAtFile         content st
+            onActivateLeaf saveAsB $ eval saveAtFile       content st
             onActivateLeaf quitB   $ widgetDestroy window
             
             return ()

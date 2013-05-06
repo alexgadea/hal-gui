@@ -15,7 +15,7 @@ data CommPos = CommPos { begin :: SourcePos
 
 makeCommPos :: SourcePos -> SourcePos -> CommPos
 makeCommPos = CommPos
-    
+
 initPos :: CommPos
 initPos = CommPos (initialPos "") (initialPos "")
 
@@ -57,6 +57,9 @@ data ExtProgram where
     ExtProg :: LIdentifier -> (CommPos,FormFun) -> 
                               ExtComm -> 
                               (CommPos,FormFun) -> ExtProgram
+
+extProgramGetExtComm :: ExtProgram -> ExtComm
+extProgramGetExtComm (ExtProg _ _ c _) = c
 
 convertExtCommToComm :: ExtComm -> Comm
 convertExtCommToComm (ExtSkip _) = Skip

@@ -173,7 +173,8 @@ extComm = try $ whites >> sepEndBy1 (choice extComms) semip >>= return . foldl1 
 
 -- | Un programa consta de declaraciones de variables, una precondición, un comando y una postcondición 
 extProgram :: ParserH ExtProgram
-extProgram = vardefs >>
+extProgram = varinputs >>
+             vardefs >>
              extPrec >>= \pre ->
              extComm >>= \c ->
              extPost >>= \post ->

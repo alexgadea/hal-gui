@@ -9,7 +9,11 @@ import Lens.Family
 import Lens.Family.TH
 
 import Graphics.UI.Gtk hiding (get)
+import Graphics.UI.Gtk.MenuComboToolbar.ToggleToolButton
 import Graphics.UI.Gtk.SourceView
+
+import Control.Concurrent
+import Control.Concurrent.MVar
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
@@ -22,7 +26,7 @@ import qualified Data.Strict.Either as SEither
 
 import qualified Hal.Evaluation.EvalLang as HEval
 
-import HGUI.Evaluation.Eval
+import HGUI.Evaluation.EvalState
 import HGUI.ExtendedLang (ExtProgram)
 
 type TextFilePath = Text
@@ -55,6 +59,7 @@ data HalInfoConsole = HalInfoConsole { _infoConTView :: TextView }
 $(mkLenses ''HalInfoConsole)
 
 data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
+                                     , _cEvalStateBox  :: VBox
                                      , _cEvalLabel     :: Label
                                      , _cStepButton    :: Button
                                      , _cContButton    :: Button
@@ -77,6 +82,7 @@ data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gTextVerif          :: SourceView
                          , _gInfoConsole        :: TextView
                          , _gHalCommConsole     :: HalCommConsole
+                         , _gHalForkFlag        :: MVar ()
                          }
 $(mkLenses ''HGReader)
 
@@ -103,7 +109,6 @@ type HGStateRef = IORef HGState
 -- | Mónada de la interfaz.
 type GuiMonad' = RWST HGReader () HGStateRef 
 type GuiMonad = GuiMonad' IO
-
 
 instance Reference IORef (StateT HEval.State IO) where
     newRef = liftIO . newRef
@@ -132,6 +137,7 @@ updateHGState f = do
                 writeRef r $ f gst
                 put r
 
+io :: MonadIO m => IO a -> m a
 io = liftIO
 
 eval :: GuiMonad () -> HGReader -> HGStateRef -> IO ()
