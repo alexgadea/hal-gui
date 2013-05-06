@@ -4,6 +4,7 @@ import Graphics.UI.Gtk hiding (get)
 import Graphics.UI.Gtk.SourceView
 
 import Control.Monad (when,unless,forM)
+import qualified Control.Monad.Trans.Reader as R (ask)
 import Control.Monad.Trans.RWS 
 import qualified Control.Monad.Trans.State as ST (runStateT,evalStateT)
 
@@ -66,6 +67,7 @@ configEvalButton = ask >>= \content -> do
                                    updateHGState ((<~) gHalConsoleState mExecState)
                                    
                                    startExecState mExecState
+                                   updateStateView True $ prgState $ makeExecState prg
                                    
                                    io $ textViewSetEditable tv False
                                    io $ widgetShowAll ebox
@@ -138,11 +140,11 @@ forkEvalStep :: MVar () -> HGReader -> HGStateRef -> IO ()
 forkEvalStep fflag content st = do
     flagUp <- tryPutMVar fflag ()
     if flagUp 
-        then forkIO (eval evalStep content st >> return ()) >> 
+        then forkIO (eval (evalStep >> return ()) content st >> return ()) >> 
              takeMVar fflag >> return ()
         else return ()
 
-evalStep :: GuiMonad ()
+evalStep :: GuiMonad Bool
 evalStep = getHGState >>= \st -> do
            let Just execSt = st ^. gHalConsoleState
                prgSt       = prgState execSt
@@ -157,7 +159,7 @@ evalStep = getHGState >>= \st -> do
            mPrgSt <- io $ takeMVar flagSt
            
            case mPrgSt of
-               Nothing -> return ()
+               Nothing -> return False
                Just prgSt -> do
                     case mnexecComm of
                         Nothing -> return ()
@@ -172,9 +174,9 @@ evalStep = getHGState >>= \st -> do
                                 tv      = content ^. gTextCode
                             updateHGState ((<~) gHalConsoleState (Just execSt'))
                             io $ postGUIAsync $ cleanPaintLineIO $ castToTextView tv
-                            updateStateView prgSt'
+                            updateStateView False prgSt'
                             maybe (return ()) (io . postGUIAsync . flip paintLineIO content) headC
-                    return ()
+                    return True
 
 takeInputs :: State -> MVar (Maybe State) -> GuiMonad ()
 takeInputs prgSt flagSt = ask >>= \content -> 
@@ -209,6 +211,8 @@ takeInputs prgSt flagSt = ask >>= \content ->
                     
                     (idsBox,iels) <- fillEntryIds ids
                     
+                    on win keyPressEvent $ configWinAccions win iels
+                    
                     configButtons win readyB cancelB iels flagSt
                     
                     containerAdd vbox idsBox
@@ -218,6 +222,16 @@ takeInputs prgSt flagSt = ask >>= \content ->
                     
                     return ()
     where
+        configWinAccions :: Window -> [(Identifier,Entry, Label)] -> EventM EKey Bool
+        configWinAccions win iels = do
+                           ev <- eventKeyName
+                           case ev of
+                               "Escape" -> io $ putMVar flagSt Nothing >> 
+                                                widgetDestroy win >> 
+                                                return True
+                               "Return" -> io $ checkEntrys win iels >> 
+                                                return True
+                               _        -> return False
         configButtons :: Window -> Button -> Button -> 
                          [(Identifier,Entry, Label)] -> MVar (Maybe State) -> IO ()
         configButtons win readyB cancelB iels flagSt = do
@@ -251,7 +265,7 @@ takeInputs prgSt flagSt = ask >>= \content ->
                             entry    <- entryNew
                             errLabel <- labelNew Nothing
                             hbox     <- hBoxNew False 0
-
+                            
                             boxPackStart hbox idLabel  PackNatural 1
                             boxPackStart hbox entry    PackNatural 1
                             boxPackStart hbox errLabel PackNatural 1
@@ -267,27 +281,56 @@ takeInputs prgSt flagSt = ask >>= \content ->
             strValue <- entryGetText entry
             case idDataType i of
                 BoolTy -> case parseBConFromString strValue of
-                            Left er -> setMsg "Valor no valido, intente de nuevo.\n" >> 
+                            Left er -> setMsg "Valor no valido." >> 
                                        return Nothing
                             Right v -> do
+                                    setMsg ""
                                     v' <- ST.evalStateT (evalBExp v) (initState,mainWin)
                                     return $ Just $ (i,Left $ v')
                 IntTy -> case parseConFromString strValue of
-                            Left er -> setMsg "Valor no valido, intente de nuevo.\n" >> 
+                            Left er -> setMsg "Valor no valido." >> 
                                        return Nothing
                             Right v -> do
+                                    setMsg ""
                                     v' <- ST.evalStateT (evalExp v) (initState,mainWin)
                                     return $ Just $ (i,Right $ v')
             where
                 setMsg :: String -> IO ()
-                setMsg msg = widgetSetNoShowAll label False >>
-                                labelSetText label msg >> 
-                                widgetShowAll label
+                setMsg msg = do
+                             widgetSetNoShowAll label False
+                             
+                             let msg' = formatErrorMsg msg
+                             
+                             set label [ labelLabel := msg'
+                                       , labelUseMarkup := True
+                                       ] 
+                             
+                             widgetShowAll label
+                formatErrorMsg :: String -> String
+                formatErrorMsg msg = "<span foreground=\"red\">"++msg++"</span>"
 
-updateStateView :: State -> GuiMonad ()
-updateStateView prgSt = ask >>= \content -> do
-                        let evalL = content ^. (gHalCommConsole . cEvalLabel)
-                        io $ postGUIAsync $ labelSetText evalL (show prgSt)
+updateStateView :: Bool -> State -> GuiMonad ()
+updateStateView cleanAll prgSt = 
+                        ask >>= \content -> getHGState >>= \st -> do
+                        let evalL   = content ^. (gHalCommConsole . cEvalLabel)
+                            Just execSt = st ^. gHalConsoleState
+                            isFinal = not $ isJust $ nexecutedTracePrg execSt
+                        io $ postGUIAsync $ do
+                            lst <- if cleanAll 
+                                      then return ""
+                                      else labelGetText evalL
+                            labelSetText evalL $ formatSt lst isFinal 
+    where
+        formatSt :: String -> Bool -> String
+        formatSt lst isFinal = 
+                let linesSt = lines lst
+                in
+                case (null linesSt,isFinal) of
+                    (True,_)      -> "Estado inicial: "++show prgSt
+                    (False,False) -> lst ++ "\n" ++ 
+                                    (show (length linesSt) ++ ": " ++ show prgSt)
+                    (False,True)  ->lst ++ "\n" ++ 
+                                    ("Estado final: " ++ show prgSt)
 
 forkEvalCont :: MVar () -> HGReader -> HGStateRef -> IO ()
 forkEvalCont fflag content st = do
@@ -299,18 +342,19 @@ forkEvalCont fflag content st = do
 
 evalCont :: GuiMonad ()
 evalCont = do
-           evalStep
+           makeStep <- evalStep
            
            st <- getHGState
            let Just execSt = st ^. gHalConsoleState
                mnexecComm = nexecutedTracePrg execSt
                
-           case mnexecComm of
-               Nothing -> return ()
-               Just nexecComm -> do 
-                                 let line   = takeCommLine nexecComm
-                                     breaks = prgBreaks execSt 
-                                 if (line `elem` breaks) 
+           case (mnexecComm,makeStep) of
+               (Nothing,_)        -> return ()
+               (_,False)          -> return ()
+               (Just nexecComm,_) -> do 
+                                let line   = takeCommLine nexecComm
+                                    breaks = prgBreaks execSt 
+                                if (line `elem` breaks) 
                                     then return ()
                                     else evalCont
 
@@ -357,8 +401,8 @@ evalRestart = ask >>= \content -> getHGState >>= \st -> do
                   tv          = content ^. gTextCode
               
               cleanPaintLine $ castToTextView tv
-              updateStateView $ prgState execSt'
               updateHGState ((<~) gHalConsoleState (Just execSt'))
+              updateStateView True $ prgState execSt'
               maybe (return ()) paintLine headC
               io $ mapM_ (removeAllMarks tv) (prgBreaks execSt)
 
