@@ -102,7 +102,9 @@ paintLineIO comm content = do
             end   <- textBufferGetEndIter buf
             
             tag   <- textTagNew (Just "HighlightLine")
-            set tag [ textTagBackground := "orange" ]
+            set tag [ textTagParagraphBackground := evalLineColour
+                    , textTagParagraphBackgroundSet := True
+                    ]
             
             table <- textBufferGetTagTable buf
             textTagTableAdd table tag

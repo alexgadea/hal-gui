@@ -37,6 +37,9 @@ halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "hal"
 breakMark :: String
 breakMark = "break"
 
+evalLineColour :: String
+evalLineColour = "#ee351de96116"
+
 -- Para el identado:
 
 funIdentWidth :: Int
