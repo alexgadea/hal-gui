@@ -382,7 +382,7 @@
                             <property name="label" translatable="yes">LISA</property>
                             <attributes>
                               <attribute name="weight" value="semibold"/>
-                              <attribute name="foreground" value="#dd9414ec44f0"/>
+                              <attribute name="foreground" value="#ee351de96116"/>
                             </attributes>
                           </object>
                           <packing>
