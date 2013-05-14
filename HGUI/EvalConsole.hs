@@ -436,7 +436,8 @@ delMark sbuf mark = do
 compile' :: GuiMonad (Maybe ExtProgram)
 compile' = get >>= \ref -> ask >>= \content ->
         do
-        code <- getCode
+        let tcode = content ^. gTextCode
+        code <- getCode tcode
         case parseExtPrgFromString code of
             Left er -> printErrorMsg ("Error :\n" ++ show er) >> return Nothing
             Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>

@@ -30,17 +30,19 @@ import Lens.Family
 -- un campo de texto con su respectivo nombre en la interfaz.
 
 -- | Crea un campo de texto al realizar una carga por archivo.
-createNewFileFromLoad :: Maybe TextFilePath -> Maybe String -> 
+createNewFileFromLoad :: Maybe TextFilePath -> Maybe (String,String) -> 
                          GuiMonad ()
 createNewFileFromLoad mfp mcode = getHGState >>= \st -> ask >>= \content ->
         do
-        unless (st ^. (gHalTextPage . isSave)) saveFile
-        updateHGState ((<~) gHalTextPage (HalTextPage mfp True))
+--         unless (st ^. (gHalTextPage . isSave)) saveFile
+--         updateHGState ((<~) gHalTextPage (HalTextPage mfp True))
         maybe (return ())
-              (\name -> updateHGState ((<~) gFileName (Just $ unpack name)))
+              (\name -> updateHGState ((<~) gFileName (Just $ unpack name)) >>
+                        updateHGState ((<~) gHalPrg Nothing))
               mfp
               
-        createTextPage mcode
+        createTextPage (mcode >>= return . fst)
+        createTextFunPage (mcode >>= return . snd)
 
 -- | Crea un nuevo archivo en blanco.
 createNewFile :: GuiMonad ()
@@ -52,31 +54,33 @@ genProofObligations = ask >>= \content -> getHGState >>= \st ->
         let mprg = st ^. gHalPrg
         let mfile = st ^. gFileName
         
-        maybe compile
+        maybe (compile >>= flip when genProofObligations)
               (\prg ->
                 maybe (printErrorMsg "El archivo no está guardado")
-                      (\fname -> io (generateFunFileString fname $ convertExtProgToProg prg) >>=
-                       \strfun -> createTextFunPage strfun)
+                      (\fname -> io (generateFunFileString (takeFileName fname) $ convertExtProgToProg prg) >>=
+                       \strfun -> createTextFunPage $ Just strfun)
                       mfile)
               mprg
 
 -- | Función para cargar un archivo.
 openFile :: GuiMonad ()
 openFile = ask >>= \ct -> get >>= \st ->
-           io $ dialogLoad "Cargar programa" halFileFilter (openFile' ct st) >>
+           let infoTV = ct ^. gInfoConsole in
+           io $ dialogLoad "Cargar programa" halFileFilter (openFile' ct st) infoTV >>
             return ()
     where
         openFile' :: HGReader -> HGStateRef -> Maybe TextFilePath ->
-                     Maybe String -> IO ()
+                     Maybe (String,String) -> IO ()
         openFile' content st mfp mcode = 
             evalRWST (createNewFileFromLoad mfp mcode) content st >> 
             return ()
 
 -- | Dialogo general para la carga de archivos.
 dialogLoad :: String -> (FileChooserDialog -> IO ()) -> 
-              (Maybe TextFilePath -> Maybe String -> IO ()) -> 
+              (Maybe TextFilePath -> Maybe (String,String) -> IO ()) -> 
+              TextView ->
               IO Bool
-dialogLoad label fileFilter action = do
+dialogLoad label fileFilter action consoleView = do
     dialog <- fileChooserDialogNew (Just label) 
                                     Nothing 
                                     FileChooserActionOpen
@@ -90,9 +94,19 @@ dialogLoad label fileFilter action = do
         ResponseAccept -> do
             selected <- fileChooserGetFilename dialog
             F.mapM_ (\filepath -> 
-                    readFile filepath >>= \code ->
-                    action (Just $ pack filepath) (Just code) >>
-                    widgetDestroy dialog) selected 
+                    let filename = dropExtension filepath in
+                        readFile (filename++".lisa") >>= \code ->
+                        C.catch (readFile (filename++".fun") >>= return . Just)
+                        (\e -> let err = show (e :: C.IOException)  in
+                                printErrorMsgIO ("Error leyendo archivo de verificación:\n" ++err) consoleView >>
+                                return Nothing)
+                        >>= \mcodefun ->
+                        maybe (return ()) 
+                              (\codefun -> action (Just $ pack filename) (Just (code,codefun)) >>
+                                printInfoMsgIO "Archivo cargado con éxito." consoleView)
+                              mcodefun >>
+                        widgetDestroy dialog)
+                    selected 
             return True
         _ -> widgetDestroy dialog >> return False
 
@@ -107,34 +121,41 @@ setFileFilter fChooser patterns title = do
 -- | Guardado directo de un archivo.
 saveFile :: GuiMonad ()
 saveFile = getHGState >>= \st -> ask >>= \content ->
-        case st ^. (gHalTextPage . fileName) of
-            Nothing -> return ()
-            Just fp -> do
-                       code <- getCode
-                       save (unpack fp) code
+        let (tc,tv) = (content ^. gTextCode,content ^. gTextVerif) in
+            case st ^. gFileName of
+                Nothing -> saveAtFile
+                Just fn -> do
+                        codelisa <- getCode tc
+                        codefun <- getCode tv
+                        save fn codelisa codefun
     where
-        save:: FilePath -> String -> GuiMonad ()
-        save filepath code = io $ writeFile filepath code
+        save:: FilePath -> String -> String ->GuiMonad ()
+        save filename codelisa codefun = 
+            let (filelisa,filefun) = (filename++".lisa",filename++".fun") in
+                io (writeFile filelisa codelisa) >>
+                io (writeFile filefun codefun)
 
--- | Guardado en, de un archivo.
+-- | Guardado en, de un archivo. (esto sería guardar como no?, es decir saveAs)
 saveAtFile :: GuiMonad ()
 saveAtFile = getHGState >>= \st -> ask >>= \content ->
              do
-             let nFile = maybe "" (takeBaseName . unpack) (st ^. (gHalTextPage . fileName))
-             code <- getCode
+             let nFile = maybe "" id (st ^. gFileName)
              
-             mfp <- saveDialog "Guardar programa" (nFile++".lisa") halFileFilter code
+             mfp <- saveDialog "Guardar programa" (nFile++".lisa") halFileFilter
              when (isJust mfp) (updateFL $ fromJust mfp)
              return ()
     where
         updateFL :: FilePath -> GuiMonad ()
-        updateFL fp = updateHGState ((<~) gHalTextPage (HalTextPage (Just $ pack fp) True)) >>
-                      updateHGState ((<~) gFileName $ Just fp)
+        updateFL fp = let fname = dropExtension fp in
+                          updateHGState ((<~) gFileName $ Just fname)
 
 -- | Dialogo general para guardar un archivo.
 saveDialog :: String -> String -> (FileChooserDialog -> IO ()) -> 
-              String -> GuiMonad (Maybe FilePath)
-saveDialog label filename fileFilter serialItem = do
+              GuiMonad (Maybe FilePath)
+saveDialog label filename fileFilter = ask >>= \content ->
+        do
+        let tcode = content ^. gTextCode
+            tverif = content ^. gTextVerif
         dialog <- io $ fileChooserDialogNew (Just label) 
                                             Nothing 
                                             FileChooserActionSave 
@@ -146,38 +167,51 @@ saveDialog label filename fileFilter serialItem = do
         io $ fileFilter dialog
         response <- io $ dialogRun dialog
 
+        codelisa <- getCode tcode
+        codefun <- getCode tverif
+        
         case response of
             ResponseAccept -> io (fileChooserGetFilename dialog) >>= 
-                              \fp -> F.mapM_ save fp >> 
-                              io (widgetDestroy dialog) >> 
-                              return fp
+                              \fp -> 
+                              maybe (return ())
+                                    (\f -> 
+                                    let filename = dropExtension f in
+                                        save (filename++".lisa") codelisa >> 
+                                        save (filename++".fun") codefun)
+                                    fp >>
+                                io (widgetDestroy dialog) >> 
+                                return fp
             _ -> io (widgetDestroy dialog) >> return Nothing
     where
-        save:: FilePath -> GuiMonad ()
-        save filepath = io $ writeFile filepath serialItem
+        save:: FilePath -> String -> GuiMonad ()
+        save filepath code = io $ writeFile filepath code
 
 -- | Filtro de programas de fun.
 halFileFilter :: (FileChooserClass f, MonadIO m) => f -> m ()
 halFileFilter dialog = io $ setFileFilter dialog ["*.lisa"] "Programa de hal"
 
 
-compile :: GuiMonad ()
+compile :: GuiMonad Bool
 compile = get >>= \st -> ask >>= \content ->
           getHGState >>= \gst ->
         do
         let consoleTV = content ^. (gHalInfoConsole . infoConTView)
             mfile = gst ^. gFileName
-        maybe saveAtFile
-              (\fp -> io $ C.catch (readFile fp >>= \code ->
+        maybe (saveAtFile >> return False)
+              (\fp -> io $ C.catch (let file = fp++".lisa" in
+                                    readFile file >>= \code ->
                                     eval (parseCode consoleTV code) content st)
                       (\e -> let err = show (e :: C.IOException)  in
-                             printErrorMsgIO ("Error leyendo archivo:\n" ++err) consoleTV)
+                             printErrorMsgIO ("Error leyendo archivo:\n" ++err) consoleTV >>
+                             return False)
                              )
               mfile
         
     where parseCode consoleTV code =
             case parseExtPrgFromString code of
-                Left er -> io $ printErrorMsgIO ("Error compilando código: " ++ show er) consoleTV
+                Left er -> io (printErrorMsgIO ("Error compilando código: " ++ show er) consoleTV)
+                           >> return False
                 Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
-                    io (printInfoMsgIO "Código compilado" consoleTV)
+                    io (printInfoMsgIO "Código compilado" consoleTV) >>
+                    return True
 

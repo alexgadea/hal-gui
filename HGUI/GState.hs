@@ -87,19 +87,21 @@ data HGReader = HGReader { _gHalToolbar         :: HalToolbar
 $(mkLenses ''HGReader)
 
 -- | Información sobre el panel derecho de la interfaz.
-data HalTextPage = HalTextPage { _fileName :: Maybe TextFilePath
-                               , _isSave   :: Bool
-                               }
-$(mkLenses ''HalTextPage)
+-- data HalTextPage = HalTextPage { _fileName :: Maybe TextFilePath
+--                                , _isSave   :: Bool
+--                                }
+-- $(mkLenses ''HalTextPage)
 
 -- | Tipo de mónada de estado, llevamos el environment de un modulo bien 
 -- chequeado y la info sobre la parte derecha de la interfaz, es decir, 
 -- la que contiene los campos de texto para escribir programas.
-data HGState = HGState { _gHalTextPage       :: HalTextPage
-                       , _gHalConsoleState   :: Maybe ExecState
+data HGState = HGState { -- _gHalTextPage       :: HalTextPage,
+                         _gHalConsoleState   :: Maybe ExecState
                        , _gHalPrg            :: Maybe ExtProgram
                        , _gCurrentText       :: SourceView
-                       , _gFileName          :: Maybe FilePath
+                       -- El siguiente campo es el nombre del archivo sin la extensión.
+                       -- Un archivo de Hal consistira de uno .lisa y uno .fun
+                       , _gFileName      :: Maybe FilePath
                        }
 $(mkLenses ''HGState)
 
@@ -140,5 +142,5 @@ updateHGState f = do
 io :: MonadIO m => IO a -> m a
 io = liftIO
 
-eval :: GuiMonad () -> HGReader -> HGStateRef -> IO ()
-eval action content str = evalRWST action content str >> return ()
+eval :: GuiMonad a -> HGReader -> HGStateRef -> IO a
+eval action content str = evalRWST action content str >>= return . fst

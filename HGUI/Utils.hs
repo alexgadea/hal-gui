@@ -3,6 +3,7 @@
 module HGUI.Utils where
 
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView
 import System.Glib.GType
 import System.Glib.GObject
 
@@ -20,16 +21,15 @@ import HGUI.GState
 textBufferInsertLn buf str = textBufferGetEndIter buf >>= \titer ->
                              textBufferInsert buf titer ('\n':str)
 
-getCode :: GuiMonad String
-getCode = ask >>= \content -> io $ 
+getCode :: SourceView -> GuiMonad String
+getCode tv = ask >>= \content -> io $ 
         do
-        let tv = content ^. gTextCode
-            textV = castToTextView tv
+        let textV = castToTextView tv
         buf       <- textViewGetBuffer textV
         start     <- textBufferGetStartIter buf
         end       <- textBufferGetEndIter buf
         textBufferGetText buf start end False
-    
+        
 -- | Inserta un string al final de un text buffer y scrollea el text view.
 --   Retorna el iter inicial y final del texto ingresado
 putStrAtEnd :: TextBuffer -> TextView -> String -> IO ()

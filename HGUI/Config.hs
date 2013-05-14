@@ -17,11 +17,11 @@ textStyleFileFun = textStylesFolder ++ "/fun.xml"
 
 funMimeType = "text/fun"
 
-languageSpecHalFile = languageSpecFolder ++ "/hal.lang"
+languageSpecHalFile = languageSpecFolder ++ "/lisa.lang"
 
-textStyleFileHal = textStylesFolder ++ "/hal.xml"
+textStyleFileHal = textStylesFolder ++ "/lisa.xml"
 
-halMimeType = "text/hal"
+halMimeType = "text/lisa"
 
 data LangInfo = LangInfo {
                     specFile :: String
@@ -32,7 +32,7 @@ data LangInfo = LangInfo {
 
 funLangInfo = LangInfo languageSpecFunFile textStyleFileFun funMimeType "fun"
 
-halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "hal"
+halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "lisa"
 
 breakMark :: String
 breakMark = "break"

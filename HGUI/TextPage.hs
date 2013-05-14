@@ -32,7 +32,7 @@ configLanguage buf langinfo = do
                 --slm (Just languageSpecFunFile) (Just funMimeType)
                 slm (Just (specFile langinfo)) (Just (mimeType langinfo))
     case mlang of
-        Nothing -> putStrLn "WARNING: No se puede cargar el highlighting para el lenguaje"
+        Nothing -> putStrLn $ "WARNING: No se puede cargar el highlighting para el lenguaje" ++ (specFile langinfo)
         Just lang -> do
             langId <- sourceLanguageGetId lang
             putStrLn ("Lenguaje = "++show langId)
@@ -110,8 +110,8 @@ createTextPage mcode = ask >>= \content -> do
                   (io . textBufferInsert tbuf start)
                   mcode
                   
-createTextFunPage :: String -> GuiMonad ()
-createTextFunPage code = ask >>= \content -> do
+createTextFunPage :: Maybe String -> GuiMonad ()
+createTextFunPage mcode = ask >>= \content -> do
             
             let textverif = content ^. gTextVerif
             
@@ -122,9 +122,9 @@ createTextFunPage code = ask >>= \content -> do
             end   <- io $ textBufferGetEndIter tbuf
             io $ textBufferDelete tbuf start end
             
-            io $ textBufferInsert tbuf start code
-
-
+            maybe (return ())
+                  (io . textBufferInsert tbuf start)
+                  mcode
 
 configTextPage :: GuiMonad ()
 configTextPage = createTextPage Nothing

@@ -88,13 +88,11 @@ makeGState xml = do
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
-            halTextPage    = HalTextPage Nothing False
             halCommConsole = HalCommConsole evalBox evalStateBox evalL 
                                             stepB contB breakB restartB cleanB
         
         gState <- newRef $ 
-                      HGState halTextPage
-                              Nothing
+                      HGState Nothing
                               Nothing
                               textcode
                               Nothing
@@ -133,7 +131,7 @@ configToolBarButtons xml = ask >>= \content -> get >>= \st ->
         onToolButtonClicked saveFButton     (eval saveFile content st)
         onToolButtonClicked saveAtFButton   (eval saveAtFile content st)
         onToolButtonClicked proofOFButton   (eval genProofObligations content st)
-        onToolButtonClicked compileMButton  (eval compile content st)
+        onToolButtonClicked compileMButton  (eval compile content st >> return ())
         onToolButtonClicked evalButton      (eval configEvalButton content st)
         onToolButtonClicked symFButton      (eval configSymFrameButton content st)
         onToolButtonClicked axiomFButton    (eval configAxFrameButton content st)
