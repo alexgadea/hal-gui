@@ -96,15 +96,16 @@ dialogLoad label fileFilter action consoleView = do
             F.mapM_ (\filepath -> 
                     let filename = dropExtension filepath in
                         readFile (filename++".lisa") >>= \code ->
-                        catch (readFile (filename++".fun") >>= return . Just)
-                        (\e -> printErrorMsgIO ("Error cargando archivo. No existe el archivo de verificación "++
-                                   filename++".fun") consoleView >> return Nothing)
+                        C.catch (readFile (filename++".fun") >>= return . Just)
+                        (\e -> let err = show (e :: C.IOException)  in
+                                printErrorMsgIO ("Error leyendo archivo de verificación:\n" ++err) consoleView >>
+                                return Nothing)
                         >>= \mcodefun ->
                         maybe (return ()) 
                               (\codefun -> action (Just $ pack filename) (Just (code,codefun)) >>
                                 printInfoMsgIO "Archivo cargado con éxito." consoleView)
                               mcodefun >>
-                        widgetDestroy dialog) 
+                        widgetDestroy dialog)
                     selected 
             return True
         _ -> widgetDestroy dialog >> return False
