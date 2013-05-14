@@ -142,5 +142,5 @@ updateHGState f = do
 io :: MonadIO m => IO a -> m a
 io = liftIO
 
-eval :: GuiMonad () -> HGReader -> HGStateRef -> IO ()
-eval action content str = evalRWST action content str >> return ()
+eval :: GuiMonad a -> HGReader -> HGStateRef -> IO a
+eval action content str = evalRWST action content str >>= return . fst

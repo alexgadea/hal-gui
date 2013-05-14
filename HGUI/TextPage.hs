@@ -32,7 +32,7 @@ configLanguage buf langinfo = do
                 --slm (Just languageSpecFunFile) (Just funMimeType)
                 slm (Just (specFile langinfo)) (Just (mimeType langinfo))
     case mlang of
-        Nothing -> putStrLn "WARNING: No se puede cargar el highlighting para el lenguaje"
+        Nothing -> putStrLn $ "WARNING: No se puede cargar el highlighting para el lenguaje" ++ (specFile langinfo)
         Just lang -> do
             langId <- sourceLanguageGetId lang
             putStrLn ("Lenguaje = "++show langId)

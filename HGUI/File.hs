@@ -37,7 +37,8 @@ createNewFileFromLoad mfp mcode = getHGState >>= \st -> ask >>= \content ->
 --         unless (st ^. (gHalTextPage . isSave)) saveFile
 --         updateHGState ((<~) gHalTextPage (HalTextPage mfp True))
         maybe (return ())
-              (\name -> updateHGState ((<~) gFileName (Just $ unpack name)))
+              (\name -> updateHGState ((<~) gFileName (Just $ unpack name)) >>
+                        updateHGState ((<~) gHalPrg Nothing))
               mfp
               
         createTextPage (mcode >>= return . fst)
@@ -53,7 +54,7 @@ genProofObligations = ask >>= \content -> getHGState >>= \st ->
         let mprg = st ^. gHalPrg
         let mfile = st ^. gFileName
         
-        maybe compile
+        maybe (compile >>= flip when genProofObligations)
               (\prg ->
                 maybe (printErrorMsg "El archivo no está guardado")
                       (\fname -> io (generateFunFileString (takeFileName fname) $ convertExtProgToProg prg) >>=
@@ -64,7 +65,8 @@ genProofObligations = ask >>= \content -> getHGState >>= \st ->
 -- | Función para cargar un archivo.
 openFile :: GuiMonad ()
 openFile = ask >>= \ct -> get >>= \st ->
-           io $ dialogLoad "Cargar programa" halFileFilter (openFile' ct st) >>
+           let infoTV = ct ^. gInfoConsole in
+           io $ dialogLoad "Cargar programa" halFileFilter (openFile' ct st) infoTV >>
             return ()
     where
         openFile' :: HGReader -> HGStateRef -> Maybe TextFilePath ->
@@ -76,8 +78,9 @@ openFile = ask >>= \ct -> get >>= \st ->
 -- | Dialogo general para la carga de archivos.
 dialogLoad :: String -> (FileChooserDialog -> IO ()) -> 
               (Maybe TextFilePath -> Maybe (String,String) -> IO ()) -> 
+              TextView ->
               IO Bool
-dialogLoad label fileFilter action = do
+dialogLoad label fileFilter action consoleView = do
     dialog <- fileChooserDialogNew (Just label) 
                                     Nothing 
                                     FileChooserActionOpen
@@ -94,11 +97,13 @@ dialogLoad label fileFilter action = do
                     let filename = dropExtension filepath in
                         readFile (filename++".lisa") >>= \code ->
                         catch (readFile (filename++".fun") >>= return . Just)
-                        (\e -> putStrLn "No existe el archivo .fun" >> return Nothing)
+                        (\e -> printErrorMsgIO ("Error cargando archivo. No existe el archivo de verificación "++
+                                   filename++".fun") consoleView >> return Nothing)
                         >>= \mcodefun ->
                         maybe (return ()) 
-                              (\codefun -> action (Just $ pack filename) (Just (code,codefun)))
-                              mcodefun>>
+                              (\codefun -> action (Just $ pack filename) (Just (code,codefun)) >>
+                                printInfoMsgIO "Archivo cargado con éxito." consoleView)
+                              mcodefun >>
                         widgetDestroy dialog) 
                     selected 
             return True
@@ -185,24 +190,27 @@ halFileFilter :: (FileChooserClass f, MonadIO m) => f -> m ()
 halFileFilter dialog = io $ setFileFilter dialog ["*.lisa"] "Programa de hal"
 
 
-compile :: GuiMonad ()
+compile :: GuiMonad Bool
 compile = get >>= \st -> ask >>= \content ->
           getHGState >>= \gst ->
         do
         let consoleTV = content ^. (gHalInfoConsole . infoConTView)
             mfile = gst ^. gFileName
-        maybe saveAtFile
+        maybe (saveAtFile >> return False)
               (\fp -> io $ C.catch (let file = fp++".lisa" in
                                     readFile file >>= \code ->
                                     eval (parseCode consoleTV code) content st)
                       (\e -> let err = show (e :: C.IOException)  in
-                             printErrorMsgIO ("Error leyendo archivo:\n" ++err) consoleTV)
+                             printErrorMsgIO ("Error leyendo archivo:\n" ++err) consoleTV >>
+                             return False)
                              )
               mfile
         
     where parseCode consoleTV code =
             case parseExtPrgFromString code of
-                Left er -> io $ printErrorMsgIO ("Error compilando código: " ++ show er) consoleTV
+                Left er -> io (printErrorMsgIO ("Error compilando código: " ++ show er) consoleTV)
+                           >> return False
                 Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
-                    io (printInfoMsgIO "Código compilado" consoleTV)
+                    io (printInfoMsgIO "Código compilado" consoleTV) >>
+                    return True
 

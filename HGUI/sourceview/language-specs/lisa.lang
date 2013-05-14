@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language id="lisa" _name="LISA" version="2.0" _section="Sources">
+  <metadata>
+    <property name="mimetypes">text/lisa</property>
+    <property name="globs">*.lisa</property>
+  </metadata>
+    <styles>
+      <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+      <style id="escaped-character" _name="Escaped Character" map-to="def:special-char"/>
+      <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+      <style id="type" _name="Data Type" map-to="def:type"/>
+    </styles>
+    <definitions>
+        <context id="lisa">
+            <include>
+                <context id="keywords" style-ref="keyword">
+                <keyword>varinput</keyword>
+                <keyword>vardef</keyword>
+                <keyword>:=</keyword>
+                <keyword>while</keyword>
+                <keyword>if</keyword>
+                <keyword>then</keyword>
+                <keyword>else</keyword>
+                <keyword>do</keyword>
+                <keyword>od</keyword>
+                <keyword>skip</keyword>
+                <keyword>abort</keyword>
+
+                </context>
+
+
+                <context ref="def:decimal"/>
+
+                <context id="types" style-ref="type">
+                    <keyword>Int</keyword>
+                    <keyword>Bool</keyword>
+                </context>
+
+            </include>
+        </context>
+    </definitions>
+</language>
