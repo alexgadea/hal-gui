@@ -4,14 +4,11 @@ module HGUI.Parser where
 import qualified Data.Map as M
 import Data.Text(pack,unpack)
 
+import Control.Monad.IO.Class
 import Control.Monad.Identity
 
 -- Imports Parsec
 import Text.Parsec 
---import Text.Parsec.Token
---import Text.Parsec.Language
---import Text.Parsec.Expr (Operator(..), Assoc(..), OperatorTable, buildExpressionParser)
---import Text.Parsec.Error (ParseError)
 
 -- Imports de Equ
 import qualified Equ.Parser as PEqu

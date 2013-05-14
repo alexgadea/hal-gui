@@ -164,21 +164,24 @@ evalStep = getHGState >>= \st -> do
                Nothing -> return False
                Just prgSt -> do
                     case mnexecComm of
-                        Nothing -> return ()
+                        Nothing -> return True
                         Just nexecComm -> 
                             ask >>= \content -> do
                             let win      = content ^. gHalWindow
                             
-                            (mc,(prgSt',_)) <- io $ ST.runStateT (evalStepExtComm nexecComm) (prgSt,win)
+                            (mmc,(prgSt',_)) <- io $ ST.runStateT (evalStepExtComm nexecComm) (prgSt,win)
                             
-                            let execSt' = updateExecState execSt mc prgSt'
-                                headC   = headNExecComm execSt'
-                                tv      = content ^. gTextCode
-                            updateHGState ((<~) gHalConsoleState (Just execSt'))
-                            io $ postGUIAsync $ cleanPaintLineIO $ castToTextView tv
-                            updateStateView False prgSt'
-                            maybe (return ()) (io . postGUIAsync . flip paintLineIO content) headC
-                    return True
+                            case mmc of
+                                Nothing -> return False
+                                Just mc -> do
+                                    let execSt' = updateExecState execSt mc prgSt'
+                                        headC   = headNExecComm execSt'
+                                        tv      = content ^. gTextCode
+                                    updateHGState ((<~) gHalConsoleState (Just execSt'))
+                                    io $ postGUIAsync $ cleanPaintLineIO $ castToTextView tv
+                                    updateStateView False prgSt'
+                                    maybe (return ()) (io . postGUIAsync . flip paintLineIO content) headC
+                                    return True
 
 takeInputs :: State -> MVar (Maybe State) -> GuiMonad ()
 takeInputs prgSt flagSt = ask >>= \content -> 
@@ -287,14 +290,14 @@ takeInputs prgSt flagSt = ask >>= \content ->
                                        return Nothing
                             Right v -> do
                                     setMsg ""
-                                    v' <- ST.evalStateT (evalBExp v) (initState,mainWin)
+                                    Just v' <- ST.evalStateT (evalBExp v) (initState,mainWin)
                                     return $ Just $ (i,Left $ v')
                 IntTy -> case parseConFromString strValue of
                             Left er -> setMsg "Valor no valido." >> 
                                        return Nothing
                             Right v -> do
                                     setMsg ""
-                                    v' <- ST.evalStateT (evalExp v) (initState,mainWin)
+                                    Just v' <- ST.evalStateT (evalExp v) (initState,mainWin)
                                     return $ Just $ (i,Right $ v')
             where
                 setMsg :: String -> IO ()

@@ -37,6 +37,12 @@ halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "lisa"
 breakMark :: String
 breakMark = "break"
 
+defToInputMsg :: String
+defToInputMsg = "Esta vardef tal vez podría ser varinput."
+
+formatErrorMsg :: String -> String
+formatErrorMsg msg = "<span foreground=\"red\">"++msg++"</span>"
+
 evalLineColour :: String
 evalLineColour = "#ee351de96116"
 

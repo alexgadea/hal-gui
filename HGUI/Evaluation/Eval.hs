@@ -30,118 +30,83 @@ import Data.Reference
 
 -- Imports de Hal
 import Hal.Lang
-
--- Imports de Hal-Gui
-import HGUI.Evaluation.EvalState
-import HGUI.GState
-import HGUI.ExtendedLang
 import Hal.Parser
 
-getNewValue :: Window -> ExpectValue -> MVar EitherBI -> IO ()
-getNewValue mainWin ev mvar = do
-                       win      <- windowNew
-                       vbox     <- vBoxNew False 0
-                       entry    <- entryNew
-                       errLabel <- labelNew Nothing
-                       
-                       set win [ windowWindowPosition := WinPosMouse
-                               , windowModal          := True
-                               , windowDecorated      := False
-                               , windowHasFrame       := False
-                               , windowTypeHint       := WindowTypeHintPopupMenu
-                               , widgetCanFocus       := True
-                               , windowTransientFor   := mainWin
-                               ]
-                       
-                       onKeyPress entry (\event -> configEntry win ev entry errLabel event)
-                       
-                       containerAdd win vbox
-                       boxPackStart vbox entry    PackNatural 1
-                       boxPackStart vbox errLabel PackNatural 1
-                       widgetSetNoShowAll errLabel True
-                       widgetShowAll win
-                        
-                       return ()
-    where
-        configEntry ::  Window -> ExpectValue -> Entry -> 
-                        Label -> Event -> IO Bool
-        configEntry win ev entry label event = 
-                    do
-                    b <- case eventKeyName event of
-                            "Return" -> getValue
-                            "Escape" -> return True
-                            _        -> return False
-                    if b then widgetDestroy win >> return False
-                         else return False
-            where
-                getValue :: IO Bool
-                getValue = do
-                    strValue <- entryGetText entry
-                    case ev of
-                        ExpectBool -> case parseBConFromString strValue of
-                                           Left er -> setMsg "Valor no valido, intente de nuevo.\n" >> return False
-                                           Right v -> do
-                                                      v' <- ST.evalStateT (evalBExp v) (initState,mainWin)
-                                                      putMVar mvar (Left v')
-                                                      return True
-                        ExpectInt -> case parseConFromString strValue of
-                                           Left er -> setMsg "Valor no valido, intente de nuevo.\n" >> return False
-                                           Right v -> do
-                                                      v' <- ST.evalStateT (evalExp v) (initState,mainWin)
-                                                      putMVar mvar (Right v')
-                                                      return True
-                    where
-                        setMsg :: String -> IO ()
-                        setMsg msg = widgetSetNoShowAll label False >>
-                                     labelSetText label msg >> 
-                                     widgetShowAll label
+-- Imports de Hal-Gui
+import HGUI.Config
+import HGUI.GState
+import HGUI.ExtendedLang
+import HGUI.Evaluation.EvalState
+
+showErrMsg :: Window -> String -> IO ()
+showErrMsg mainWin msg = postGUIAsync $ do
+            win  <- windowNew
+            vbox <- vBoxNew False 0
+            
+            label <- labelNew Nothing 
+            set label [ labelLabel := formatErrorMsg msg
+                      , labelUseMarkup := True
+                      ] 
+            
+            readyB <- buttonNewWithLabel "Aceptar"
+            
+            set win [ windowWindowPosition := WinPosCenter
+                    , windowModal          := True
+                    , windowDecorated      := False
+                    , windowHasFrame       := False
+                    , windowTypeHint       := WindowTypeHintPopupMenu
+                    , widgetCanFocus       := True
+                    , windowTransientFor   := mainWin
+                    ]
+            
+            containerAdd win vbox
+            boxPackStart vbox label  PackNatural 2
+            boxPackStart vbox readyB PackNatural 2
+            
+            onClicked readyB  $ widgetDestroy win
+            
+            widgetShowAll win
+            
+            return ()
 
 -- | Evaluador de los operadores binarios enteros.
-evalIntBOp :: IntBOp -> ProgState Int -> ProgState Int -> ProgState Int
-evalIntBOp Plus   = liftA2 (+)
-evalIntBOp Times  = liftA2 (*)
-evalIntBOp Substr = liftA2 (-)
-evalIntBOp Div    = liftA2 div
-evalIntBOp Mod    = liftA2 mod
+evalIntBOp :: IntBOp -> ProgState (Maybe Int) -> 
+              ProgState (Maybe Int) -> ProgState (Maybe Int)
+evalIntBOp Plus   = liftA2 $ liftA2 (+)
+evalIntBOp Times  = liftA2 $ liftA2 (*)
+evalIntBOp Substr = liftA2 $ liftA2 (-)
+evalIntBOp Div    = liftA2 $ liftA2 div
+evalIntBOp Mod    = liftA2 $ liftA2 mod
 
 -- | Evaluador de los operadores binarios boleanos.
-evalBoolBOp :: BoolBOp -> ProgState Bool -> ProgState Bool -> ProgState Bool
-evalBoolBOp And = liftA2 (&&)
-evalBoolBOp Or  = liftA2 (||)
+evalBoolBOp :: BoolBOp -> ProgState (Maybe Bool) -> 
+               ProgState (Maybe Bool) -> ProgState (Maybe Bool)
+evalBoolBOp And = liftA2 $ liftA2 (&&)
+evalBoolBOp Or  = liftA2 $ liftA2 (||)
 
 -- | Evaluador de los operadores unarios boleanos.
-evalBoolUOp :: BoolUOp -> ProgState Bool -> ProgState Bool
-evalBoolUOp Not = fmap not
+evalBoolUOp :: BoolUOp -> ProgState (Maybe Bool) -> ProgState (Maybe Bool)
+evalBoolUOp Not = liftA $ fmap not
 
 -- | Evaluador de las relaciones binarias.
 evalRelOp :: (Eq a, Ord a) => 
-             RelOp -> ProgState a -> ProgState a -> ProgState Bool
-evalRelOp Equal  = liftA2 (==)
-evalRelOp Lt     = liftA2 (<)
+             RelOp -> ProgState (Maybe a) -> ProgState (Maybe a) -> 
+             ProgState (Maybe Bool)
+evalRelOp Equal = liftA2 $ liftA2 (==)
+evalRelOp Lt    = liftA2 $ liftA2 (<)
 
 -- | Evaluador de expresiones enteras.
-evalExp :: Exp -> ProgState Int
+evalExp :: Exp -> ProgState (Maybe Int)
 evalExp (IBOp iop e e') = evalIntBOp iop (evalExp e) (evalExp e')
-evalExp (ICon i)  = return i
+evalExp (ICon i) = return $ Just i
 evalExp ide@(IntId i) = do 
-                    (st,win) <- ST.get
-                    let idSts = vars st
-                    
-                    mvalue <- getValue i idSts
-                    
-                    case mvalue of
-                        Just v -> return v
-                        Nothing -> do
-                            mvar  <- liftIO $ newEmptyMVar
-                            liftIO $ postGUIAsync $ getNewValue win ExpectInt mvar
-                            evalE <- liftIO $ takeMVar mvar
-                                    
-                            let idSts = vars st
-                                idSts' = L.map (updateValue i evalE) idSts
-                            
-                            ST.put (st { vars =  idSts'},win)
-                                    
-                            return $ fromRight evalE
+            (st,win) <- ST.get
+            let idSts = vars st
+            
+            mvalue <- getValue i idSts
+            
+            maybe (liftIO (showErrMsg win defToInputMsg) >> return Nothing)
+                    (return . Just) mvalue
     where
         getValue :: Identifier -> [StateTuple] -> ProgState (Maybe Int)
         getValue i idSts = 
@@ -150,36 +115,39 @@ evalExp ide@(IntId i) = do
                     Just (IntVar _ mv) -> return mv
 
 -- | Evaluador de expresiones boleanas.
-evalBExp :: BExp -> ProgState Bool
+evalBExp :: BExp -> ProgState (Maybe Bool)
 evalBExp (BRel rop e e') = evalRelOp rop (evalExp e) (evalExp e')
 evalBExp (BUOp bop e)    = evalBoolUOp bop $ evalBExp e
 evalBExp (BBOp bop e e') = evalBoolBOp bop (evalBExp e) (evalBExp e')
-evalBExp (BCon b) = return b
-evalBExp ide@(BoolId i) = do 
-                    (st,win) <- ST.get
-                    let idSts = vars st
-                    
-                    mvalue <- getValue i idSts
-                    
-                    case mvalue of
-                        Just v -> return v
-                        Nothing -> do
-                            mvar  <- liftIO $ newEmptyMVar
-                            liftIO $ postGUIAsync $ getNewValue win ExpectBool mvar
-                            evalE <- liftIO $ takeMVar mvar
-                                    
-                            let idSts = vars st
-                                idSts' = L.map (updateValue i evalE) idSts
-                            
-                            ST.put (st { vars =  idSts'},win)
-                                    
-                            return $ fromLeft evalE
-    where
-        getValue :: Identifier -> [StateTuple] -> ProgState (Maybe Bool)
-        getValue i idSts = 
-                case L.find (==(BoolVar i Nothing)) idSts of
-                    Nothing -> error "Imposible, siempre encontramos una variable."
-                    Just (BoolVar _ mv) -> return mv
+evalBExp (BCon b) = return $ Just b
+-- evalBExp ide@(BoolId i) = do 
+--                     (st,win) <- ST.get
+--                     let idSts = vars st
+--                     
+--                     mvalue <- getValue i idSts
+--                     
+--                     case mvalue of
+--                         Just v -> return mvalue
+--                         Nothing -> do
+--                             mvar  <- liftIO $ newEmptyMVar
+--                             liftIO $ postGUIAsync $ getNewValue win ExpectBool mvar
+--                             mevalE <- liftIO $ takeMVar mvar
+--                             
+--                             case mevalE of
+--                                 Nothing -> return Nothing
+--                                 Just evalE -> do
+--                                     let idSts = vars st
+--                                         idSts' = L.map (updateValue i evalE) idSts
+--                                     
+--                                     ST.put (st { vars =  idSts'},win)
+--                                             
+--                                     return $ fromLeft evalE
+--     where
+--         getValue :: Identifier -> [StateTuple] -> ProgState (Maybe Bool)
+--         getValue i idSts = 
+--                 case L.find (==(BoolVar i Nothing)) idSts of
+--                     Nothing -> error "Imposible, siempre encontramos una variable."
+--                     Just (BoolVar _ mv) -> return mv
 
 -- | Actualiza el valor de un identificador en una tupla del estado.
 updateValue :: Identifier -> Either Bool Int -> StateTuple -> StateTuple
@@ -197,47 +165,67 @@ addValue i (Left v) st  = st {vars = (vars st)++[BoolVar i $ Just v]}
 addValue i (Right v) st = st {vars = (vars st)++[IntVar i $ Just v]}
 
 -- | Evaluador de los comandos.
-evalExtComm :: ExtComm -> ProgState ()
-evalExtComm (ExtSkip _) = return ()
-evalExtComm (ExtAbort _) = return ()
-evalExtComm (ExtAssert _ b) = return ()
+evalExtComm :: ExtComm -> ProgState (Maybe ())
+evalExtComm (ExtSkip _) = return $ Just ()
+evalExtComm (ExtAbort _) = return $ Just ()
+evalExtComm (ExtAssert _ b) = return $ Just ()
 evalExtComm (ExtIf _ b c c') = evalBExp b >>= \vb ->
-                       if vb then evalExtComm c else evalExtComm c'
+                    case vb of
+                        Nothing    -> return Nothing
+                        Just True  -> evalExtComm c 
+                        Just False -> evalExtComm c'
 evalExtComm (ExtIAssig _ a e) = do 
-                        evalE <- evalExp e
+            mevalE <- evalExp e
+            case mevalE of
+                Nothing -> return Nothing
+                Just evalE -> do
                         (st,win) <- ST.get 
                         let idSts = vars st
                         let idSts' = L.map (updateValue a (Right evalE)) idSts
                         ST.put (st { vars =  idSts'},win)
+                        return $ Just ()
 evalExtComm (ExtBAssig _ a e) = do 
-                        evalE <- evalBExp e
+            mevalE <- evalBExp e
+            
+            case mevalE of
+                Nothing -> return Nothing
+                Just evalE -> do
                         (st,win) <- ST.get
                         let idSts = vars st
                         let idSts' = L.map (updateValue a (Left evalE)) idSts
                         ST.put (st { vars =  idSts'},win)
+                        return $ Just ()
 evalExtComm (ExtSeq c c') = evalExtComm c >> evalExtComm c'
 evalExtComm (ExtDo _ inv b c) = fix evalDo
     where
-        evalDo :: ProgState () -> ProgState ()
+        evalDo :: ProgState (Maybe ()) -> ProgState (Maybe ())
         evalDo f = do
-                   vb <- evalBExp b
-                   if vb then (evalExtComm (ExtSeq c (ExtAssert initPos inv))) >> f 
-                         else return ()
+            vb <- evalBExp b
+            case vb of
+                Nothing    -> return Nothing
+                Just True  -> (evalExtComm (ExtSeq c (ExtAssert initPos inv))) >> f
+                Just False -> return $ Just ()
 
-evalStepExtComm :: ExtComm -> ProgState (Maybe ExtComm,Maybe ExtComm)
-evalStepExtComm (ExtSeq c c') = evalStepExtComm c >>= \mcc' -> 
-                          case (mcc') of
-                              (Just c,Nothing)  -> return (Just c ,Just c')
-                              (Just c,Just c'') -> return (Just c ,Just (ExtSeq c'' c'))
-                              (Nothing,Just c)  -> return (Nothing,Just (ExtSeq c c'))
+evalStepExtComm :: ExtComm -> ProgState (Maybe (Maybe ExtComm,Maybe ExtComm))
+evalStepExtComm (ExtSeq c c') = evalStepExtComm c >>= \mmcc' -> 
+        case mmcc' of
+            Nothing -> return Nothing
+            Just (Just c,Nothing)  -> return $ Just (Just c ,Just c')
+            Just (Just c,Just c'') -> return $ Just (Just c ,Just (ExtSeq c'' c'))
+            Just (Nothing,Just c)  -> return $ Just (Nothing,Just (ExtSeq c c'))
 evalStepExtComm wc@(ExtDo _ _ b c) = do
-                          vb <- evalBExp b
-                          if vb 
-                             then return (Nothing,Just $ ExtSeq c wc)
-                             else return (Just wc,Nothing)
+                vb <- evalBExp b
+                case vb of
+                    Nothing    -> return Nothing
+                    Just True  -> return $ Just (Nothing,Just $ ExtSeq c wc)
+                    Just False -> return $ Just (Just wc,Nothing)
 evalStepExtComm wc@(ExtIf _ b c c') = do
-                          vb <- evalBExp b
-                          if vb 
-                             then return (Nothing,Just c)
-                             else return (Nothing,Just c')
-evalStepExtComm c = evalExtComm c >> return (Just c,Nothing)
+                    vb <- evalBExp b
+                    case vb of
+                        Nothing    -> return Nothing
+                        Just True  -> return $ Just (Nothing,Just c)
+                        Just False -> return $ Just (Nothing,Just c')
+evalStepExtComm c = evalExtComm c >>= \m ->
+                    case m of
+                        Nothing -> return Nothing
+                        Just _  -> return (Just (Just c,Nothing))
