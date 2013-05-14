@@ -88,13 +88,11 @@ makeGState xml = do
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
-            halTextPage    = HalTextPage Nothing False
             halCommConsole = HalCommConsole evalBox evalStateBox evalL 
                                             stepB contB breakB restartB cleanB
         
         gState <- newRef $ 
-                      HGState halTextPage
-                              Nothing
+                      HGState Nothing
                               Nothing
                               textcode
                               Nothing
