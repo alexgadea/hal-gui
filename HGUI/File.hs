@@ -123,7 +123,7 @@ saveFile :: GuiMonad ()
 saveFile = getHGState >>= \st -> ask >>= \content ->
         let (tc,tv) = (content ^. gTextCode,content ^. gTextVerif) in
             case st ^. gFileName of
-                Nothing -> return ()
+                Nothing -> saveAtFile
                 Just fn -> do
                         codelisa <- getCode tc
                         codefun <- getCode tv
