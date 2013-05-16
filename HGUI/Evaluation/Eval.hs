@@ -2,7 +2,7 @@
     
     Para evaluar asumimos el programa typechekeo sin problemas.
 -}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, NPlusKPatterns #-}
 module HGUI.Evaluation.Eval where
 
 import Graphics.UI.Gtk hiding (get,Plus,eventKeyName)
@@ -22,11 +22,21 @@ import Control.Concurrent.MVar
 import System.IO
 
 import qualified Data.List as L
+import qualified Data.Map as Map
 import Data.Maybe
 import Data.Either
 import Data.Reference
 
+-- Imports de equ.
+import Equ.Expr
+import qualified Equ.Types as EquType
+import Equ.Syntax
+import qualified Equ.PreExpr as PExpr
+import qualified Equ.Theories.Arith as Arith
+import qualified Equ.Theories.FOL as FOL
+
 -- Imports de Fun
+import qualified Fun.Eval.Eval as Fun
 
 -- Imports de Hal
 import Hal.Lang
@@ -106,7 +116,7 @@ evalExp ide@(IntId i) = do
             mvalue <- getValue i idSts
             
             maybe (liftIO (showErrMsg win defToInputMsg) >> return Nothing)
-                    (return . Just) mvalue
+                  (return . Just) mvalue
     where
         getValue :: Identifier -> [StateTuple] -> ProgState (Maybe Int)
         getValue i idSts = 
@@ -120,34 +130,20 @@ evalBExp (BRel rop e e') = evalRelOp rop (evalExp e) (evalExp e')
 evalBExp (BUOp bop e)    = evalBoolUOp bop $ evalBExp e
 evalBExp (BBOp bop e e') = evalBoolBOp bop (evalBExp e) (evalBExp e')
 evalBExp (BCon b) = return $ Just b
--- evalBExp ide@(BoolId i) = do 
---                     (st,win) <- ST.get
---                     let idSts = vars st
---                     
---                     mvalue <- getValue i idSts
---                     
---                     case mvalue of
---                         Just v -> return mvalue
---                         Nothing -> do
---                             mvar  <- liftIO $ newEmptyMVar
---                             liftIO $ postGUIAsync $ getNewValue win ExpectBool mvar
---                             mevalE <- liftIO $ takeMVar mvar
---                             
---                             case mevalE of
---                                 Nothing -> return Nothing
---                                 Just evalE -> do
---                                     let idSts = vars st
---                                         idSts' = L.map (updateValue i evalE) idSts
---                                     
---                                     ST.put (st { vars =  idSts'},win)
---                                             
---                                     return $ fromLeft evalE
---     where
---         getValue :: Identifier -> [StateTuple] -> ProgState (Maybe Bool)
---         getValue i idSts = 
---                 case L.find (==(BoolVar i Nothing)) idSts of
---                     Nothing -> error "Imposible, siempre encontramos una variable."
---                     Just (BoolVar _ mv) -> return mv
+evalBExp ide@(BoolId i) = do 
+            (st,win) <- ST.get
+            let idSts = vars st
+            
+            mvalue <- getValue i idSts
+            
+            maybe (liftIO (showErrMsg win defToInputMsg) >> return Nothing)
+                  (return . Just) mvalue
+    where
+        getValue :: Identifier -> [StateTuple] -> ProgState (Maybe Bool)
+        getValue i idSts = 
+                case L.find (==(BoolVar i Nothing)) idSts of
+                    Nothing -> error "Imposible, siempre encontramos una variable."
+                    Just (BoolVar _ mv) -> return mv
 
 -- | Actualiza el valor de un identificador en una tupla del estado.
 updateValue :: Identifier -> Either Bool Int -> StateTuple -> StateTuple
@@ -164,11 +160,55 @@ addValue :: Identifier -> Either Bool Int -> State -> State
 addValue i (Left v) st  = st {vars = (vars st)++[BoolVar i $ Just v]}
 addValue i (Right v) st = st {vars = (vars st)++[IntVar i $ Just v]}
 
+evalExprFun :: FormFun -> ProgState (Maybe ())
+evalExprFun (Expr f) = if PExpr.preExprIsQuant f then return (Just ())
+                       else do
+                       (st,win) <- ST.get
+                       let funExpr = Fun.eval (makeEnv st) f
+                       if Expr funExpr == FOL.true
+                           then return $ Just ()
+                       else if Expr funExpr == FOL.false
+                           then liftIO (showErrMsg win guardFalseMsg) >> 
+                                return Nothing
+                       else liftIO (showErrMsg win guardTypeErrorMsg) >> 
+                            return Nothing
+    where
+        makeEnv :: State -> Fun.EvalEnv
+        makeEnv = foldl makeFunVar Map.empty . vars
+        makeFunVar :: Fun.EvalEnv -> StateTuple -> Fun.EvalEnv
+        makeFunVar env (IntVar  i mv) = makeEFunVar env i mv
+        makeFunVar env (BoolVar i mv) = makeBFunVar env i mv
+        
+        makeEFunVar :: Fun.EvalEnv -> Identifier -> Maybe Int -> Fun.EvalEnv
+        makeEFunVar env i (Just v) = 
+                            Map.insert (makeVar i) ([],(makeIntVal v)) env
+        makeBFunVar :: Fun.EvalEnv -> Identifier -> Maybe Bool -> Fun.EvalEnv
+        makeBFunVar env i (Just v) = 
+                            Map.insert (makeVar i) ([],(makeBoolVal v)) env
+        
+        makeVar :: Identifier -> Variable
+        makeVar i = PExpr.var (idName i) (makeType i)
+        makeType :: Identifier -> EquType.Type
+        makeType i = case idDataType i of
+                        IntTy  -> EquType.tyInt
+                        BoolTy -> EquType.tyBool
+        
+        makeBoolVal :: Bool -> PExpr.PreExpr
+        makeBoolVal True  = let Expr t = FOL.true in t
+        makeBoolVal False = let Expr t = FOL.false in t
+        makeIntVal :: Int -> PExpr.PreExpr
+        makeIntVal 0     = let Expr z  = Arith.zero in z
+        makeIntVal (n+1) = let Expr n' = Arith.successor (Expr $ makeIntVal n) 
+                           in n'
+
+        
+--type EvalEnv = M.Map Variable ([Variable],PreExpr)
+        
 -- | Evaluador de los comandos.
 evalExtComm :: ExtComm -> ProgState (Maybe ())
 evalExtComm (ExtSkip _) = return $ Just ()
 evalExtComm (ExtAbort _) = return $ Just ()
-evalExtComm (ExtAssert _ b) = return $ Just ()
+evalExtComm (ExtAssert _ b) = evalExprFun b
 evalExtComm (ExtIf _ b c c') = evalBExp b >>= \vb ->
                     case vb of
                         Nothing    -> return Nothing

@@ -40,6 +40,12 @@ breakMark = "break"
 defToInputMsg :: String
 defToInputMsg = "Esta vardef tal vez podría ser varinput."
 
+guardFalseMsg :: String
+guardFalseMsg = "La guarda no es verdadera."
+
+guardTypeErrorMsg :: String
+guardTypeErrorMsg = "La guarda no tiene sentido."
+
 formatErrorMsg :: String -> String
 formatErrorMsg msg = "<span foreground=\"red\">"++msg++"</span>"
 
