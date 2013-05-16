@@ -72,6 +72,7 @@ makeGState xml = do
         breakB   <- builderGetObject xml castToButton "breakButton"
         restartB <- builderGetObject xml castToButton "restartButton"
         cleanB   <- builderGetObject xml castToButton "cleanButton"
+        stopB    <- builderGetObject xml castToToggleButton "stopButton"
         
         boxLisa <- builderGetObject xml castToVBox "boxLisaCode"
         boxFun  <- builderGetObject xml castToVBox "boxFunCode"
@@ -83,13 +84,15 @@ makeGState xml = do
         configText boxFun textverif
         
         forkFlag <- newEmptyMVar
+        stopFlag <- newMVar ()
         
         let halToolbarST   = HalToolbar symFrameB axFrameB evalB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
             halCommConsole = HalCommConsole evalBox evalStateBox evalL 
-                                            stepB contB breakB restartB cleanB
+                                            stepB contB breakB restartB 
+                                            cleanB stopB
         
         gState <- newRef $ 
                       HGState Nothing
@@ -108,6 +111,7 @@ makeGState xml = do
                                infoTV
                                halCommConsole
                                forkFlag
+                               stopFlag
         
         return (gReader,gState)
 

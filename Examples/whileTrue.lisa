@@ -1,0 +1,12 @@
+
+vardef q : Int;
+
+{ Pre: True }
+
+q := 0;
+
+while True {True} do
+q := q + 1;
+od
+
+{ Post : True }

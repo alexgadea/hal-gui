@@ -127,61 +127,82 @@ configEvalConsole = ask >>= \content -> get >>= \st -> io $ do
                     breakB   = content ^. (gHalCommConsole . cBreakButton  )
                     restartB = content ^. (gHalCommConsole . cRestartButton)
                     cleanB   = content ^. (gHalCommConsole . cCleanButton  )
+                    stopB    = content ^. (gHalCommConsole . cStopButton   )
                     forkFlag = content ^. gHalForkFlag
+                    stopFlag = content ^. gHalStopFlag
                 
-                onClicked stepB    (forkEvalStep forkFlag content st)
-                onClicked contB    (forkEvalCont forkFlag content st)
+                onClicked stepB    (forkEvalStep forkFlag stopFlag content st)
+                onClicked contB    (forkEvalCont forkFlag stopFlag content st)
                 onClicked breakB   (eval evalBreak   content st)
                 onClicked restartB (eval evalRestart content st)
                 onClicked cleanB   (eval evalClean   content st)
+                onClicked stopB    (eval evalStop    content st)
                 
                 widgetHideAll ebox
                 widgetHideAll stbox
 
-forkEvalStep :: MVar () -> HGReader -> HGStateRef -> IO ()
-forkEvalStep fflag content st = do
-    flagUp <- tryPutMVar fflag ()
-    if flagUp 
-        then forkIO (eval (evalStep >> return ()) content st >> return ()) >> 
-             takeMVar fflag >> return ()
-        else return ()
+evalStop :: GuiMonad ()
+evalStop = ask >>= \content -> io $ do
+           let stopFlag = content ^. gHalStopFlag
+               stopB    = content ^. (gHalCommConsole . cStopButton)
+           
+           active <- toggleButtonGetActive stopB
+           if active
+              then takeMVar stopFlag >> return ()
+              else putMVar  stopFlag ()
+
+forkEvalStep :: MVar () -> MVar () -> HGReader -> HGStateRef -> IO ()
+forkEvalStep fflag sflag content st = do
+                                flagUpStop <- fmap not $ isEmptyMVar sflag
+                                if flagUpStop
+                                    then forkS
+                                    else return ()
+    where
+        forkS :: IO ()
+        forkS = do
+                flagUpFork <- tryPutMVar fflag ()
+                if flagUpFork
+                    then forkIO (eval (evalStep >> return ()) content st >> 
+                                takeMVar fflag >> return ()) >> return ()
+                    else return ()
 
 evalStep :: GuiMonad Bool
 evalStep = getHGState >>= \st -> do
-           let Just execSt = st ^. gHalConsoleState
-               prgSt       = prgState execSt
-               mexecComm   = executedTracePrg execSt
-               mnexecComm  = nexecutedTracePrg execSt
-           
-           flagSt <- io $ newEmptyMVar
-           
-           maybe (takeInputs prgSt flagSt)
-                 (const $ io $ putMVar flagSt (Just prgSt)) mexecComm
-           
-           mPrgSt <- io $ takeMVar flagSt
-           
-           case mPrgSt of
-               Nothing -> return False
-               Just prgSt -> do
-                    case mnexecComm of
-                        Nothing -> return True
-                        Just nexecComm -> 
-                            ask >>= \content -> do
-                            let win      = content ^. gHalWindow
-                            
-                            (mmc,(prgSt',_)) <- io $ ST.runStateT (evalStepExtComm nexecComm) (prgSt,win)
-                            
-                            case mmc of
-                                Nothing -> return False
-                                Just mc -> do
-                                    let execSt' = updateExecState execSt mc prgSt'
-                                        headC   = headNExecComm execSt'
-                                        tv      = content ^. gTextCode
-                                    updateHGState ((<~) gHalConsoleState (Just execSt'))
-                                    io $ postGUIAsync $ cleanPaintLineIO $ castToTextView tv
-                                    updateStateView False prgSt'
-                                    maybe (return ()) (io . postGUIAsync . flip paintLineIO content) headC
-                                    return True
+    let Just execSt = st ^. gHalConsoleState
+        prgSt       = prgState execSt
+        mexecComm   = executedTracePrg execSt
+        mnexecComm  = nexecutedTracePrg execSt
+    
+    flagSt <- io $ newEmptyMVar
+    
+    maybe (takeInputs prgSt flagSt)
+          (const $ io $ putMVar flagSt (Just prgSt)) mexecComm
+    
+    mPrgSt <- io $ takeMVar flagSt
+    
+    case mPrgSt of
+        Nothing -> return False
+        Just prgSt -> do
+            case mnexecComm of
+                Nothing -> return True
+                Just nexecComm -> 
+                    ask >>= \content -> do
+                    let win = content ^. gHalWindow
+                    
+                    (mmc,(prgSt',_)) <- io $ ST.runStateT (evalStepExtComm nexecComm) (prgSt,win)
+                    
+                    case mmc of
+                        Nothing -> return False
+                        Just mc -> do
+                            let execSt' = updateExecState execSt mc prgSt'
+                                headC   = headNExecComm execSt'
+                                tv      = content ^. gTextCode
+                            updateHGState ((<~) gHalConsoleState (Just execSt'))
+                            io $ postGUIAsync $ cleanPaintLineIO $ castToTextView tv
+                            updateStateView False prgSt'
+                            maybe (return ()) 
+                                  (io . postGUIAsync . flip paintLineIO content) headC
+                            return True
 
 takeInputs :: State -> MVar (Maybe State) -> GuiMonad ()
 takeInputs prgSt flagSt = ask >>= \content -> 
@@ -337,26 +358,46 @@ updateStateView cleanAll prgSt =
                     (False,True)  ->lst ++ "\n" ++ 
                                     ("Estado final: " ++ show prgSt)
 
-forkEvalCont :: MVar () -> HGReader -> HGStateRef -> IO ()
-forkEvalCont fflag content st = do
-    flagUp <- tryPutMVar fflag ()
-    if flagUp 
-        then forkIO (eval evalCont content st >> return ()) >> 
-             takeMVar fflag >> return ()
-        else return ()
+forkEvalCont :: MVar () -> MVar () -> HGReader -> HGStateRef -> IO ()
+forkEvalCont fflag sflag content st = do
+                flagUpStop <- fmap not $ isEmptyMVar sflag
+                if flagUpStop
+                    then forkC
+                    else return ()
+    where
+        forkC :: IO ()
+        forkC = do
+                flagUpFork <- tryPutMVar fflag ()
+                if flagUpFork 
+                    then forkIO evalC >> return ()
+                    else return ()
+        evalC :: IO ()
+        evalC = readMVar sflag >> 
+                eval evalCont content st >> 
+                takeMVar fflag >>
+                return ()
 
 evalCont :: GuiMonad ()
-evalCont = do
-           makeStep <- evalStep
-           
-           st <- getHGState
-           let Just execSt = st ^. gHalConsoleState
-               mnexecComm = nexecutedTracePrg execSt
-               
-           case (mnexecComm,makeStep) of
-               (Nothing,_)        -> return ()
-               (_,False)          -> return ()
-               (Just nexecComm,_) -> do 
+evalCont = ask >>= \content -> do
+        let stopFlag = content ^. gHalStopFlag
+        flagUpStop <- fmap not $ io $ isEmptyMVar stopFlag
+        if flagUpStop
+            then evalC
+            else return ()
+    where
+        evalC :: GuiMonad ()
+        evalC = do
+            io $ threadDelay evalContDelay
+            makeStep <- evalStep
+            
+            st <- getHGState
+            let Just execSt = st ^. gHalConsoleState
+                mnexecComm = nexecutedTracePrg execSt
+                
+            case (mnexecComm,makeStep) of
+                (Nothing,_)        -> return ()
+                (_,False)          -> return ()
+                (Just nexecComm,_) -> do 
                                 let line   = takeCommLine nexecComm
                                     breaks = prgBreaks execSt 
                                 if (line `elem` breaks) 

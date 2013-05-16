@@ -2,7 +2,7 @@
     
     Para evaluar asumimos el programa typechekeo sin problemas.
 -}
-{-# LANGUAGE RecordWildCards, NPlusKPatterns #-}
+{-# LANGUAGE RecordWildCards, NPlusKPatterns, DoAndIfThenElse #-}
 module HGUI.Evaluation.Eval where
 
 import Graphics.UI.Gtk hiding (get,Plus,eventKeyName)
@@ -207,7 +207,8 @@ evalExprFun (Expr f) = if PExpr.preExprIsQuant f then return (Just ())
 -- | Evaluador de los comandos.
 evalExtComm :: ExtComm -> ProgState (Maybe ())
 evalExtComm (ExtSkip _) = return $ Just ()
-evalExtComm (ExtAbort _) = return $ Just ()
+evalExtComm (ExtAbort _) = ST.get >>= \(_,win) -> 
+                           liftIO (showErrMsg win abortMsg) >> return Nothing
 evalExtComm (ExtAssert _ b) = evalExprFun b
 evalExtComm (ExtIf _ b c c') = evalBExp b >>= \vb ->
                     case vb of

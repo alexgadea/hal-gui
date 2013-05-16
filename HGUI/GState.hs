@@ -66,12 +66,19 @@ data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
                                      , _cBreakButton   :: Button
                                      , _cRestartButton :: Button
                                      , _cCleanButton   :: Button
+                                     , _cStopButton    :: ToggleButton
                                      }
 $(mkLenses ''HalCommConsole)
 
 data HalEditorPaned = HalEditorPaned { _epaned :: VPaned }
 $(mkLenses ''HalEditorPaned)
 
+-- Con ForkFlag restringimos la creación de un thread para evaluar. La idea
+-- es que si damos dos steps, el primero crea un thread pero el segundo no hace
+-- nada, recién cuando el primero termina al dar de nuevo step, se crea
+-- otro thread.
+-- Con StopFlag restringimos el avance de la evaluación, la idea principal
+-- es parar cualquier ejecución que no tenga final.
 data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gHalSymbolList      :: HalSymList
                          , _gHalAxList          :: HalAxList
@@ -83,14 +90,9 @@ data HGReader = HGReader { _gHalToolbar         :: HalToolbar
                          , _gInfoConsole        :: TextView
                          , _gHalCommConsole     :: HalCommConsole
                          , _gHalForkFlag        :: MVar ()
+                         , _gHalStopFlag        :: MVar ()
                          }
 $(mkLenses ''HGReader)
-
--- | Información sobre el panel derecho de la interfaz.
--- data HalTextPage = HalTextPage { _fileName :: Maybe TextFilePath
---                                , _isSave   :: Bool
---                                }
--- $(mkLenses ''HalTextPage)
 
 -- | Tipo de mónada de estado, llevamos el environment de un modulo bien 
 -- chequeado y la info sobre la parte derecha de la interfaz, es decir, 

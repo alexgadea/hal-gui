@@ -46,6 +46,12 @@ guardFalseMsg = "La guarda no es verdadera."
 guardTypeErrorMsg :: String
 guardTypeErrorMsg = "La guarda no tiene sentido."
 
+abortMsg :: String
+abortMsg = "Ha ocurrido un abort."
+
+evalContDelay :: Int
+evalContDelay = 500000 --microsegundos
+
 formatErrorMsg :: String -> String
 formatErrorMsg msg = "<span foreground=\"red\">"++msg++"</span>"
 
