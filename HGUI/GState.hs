@@ -66,7 +66,7 @@ data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
                                      , _cBreakButton   :: Button
                                      , _cRestartButton :: Button
                                      , _cCleanButton   :: Button
-                                     , _cStopButton    :: ToggleButton
+                                     , _cStopButton    :: Button
                                      }
 $(mkLenses ''HalCommConsole)
 

@@ -72,7 +72,7 @@ makeGState xml = do
         breakB   <- builderGetObject xml castToButton "breakButton"
         restartB <- builderGetObject xml castToButton "restartButton"
         cleanB   <- builderGetObject xml castToButton "cleanButton"
-        stopB    <- builderGetObject xml castToToggleButton "stopButton"
+        stopB    <- builderGetObject xml castToButton "stopButton"
         
         boxLisa <- builderGetObject xml castToVBox "boxLisaCode"
         boxFun  <- builderGetObject xml castToVBox "boxFunCode"

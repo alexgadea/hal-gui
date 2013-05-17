@@ -129,10 +129,9 @@ configEvalConsole = ask >>= \content -> get >>= \st -> io $ do
                     cleanB   = content ^. (gHalCommConsole . cCleanButton  )
                     stopB    = content ^. (gHalCommConsole . cStopButton   )
                     forkFlag = content ^. gHalForkFlag
-                    stopFlag = content ^. gHalStopFlag
                 
-                onClicked stepB    (forkEvalStep forkFlag stopFlag content st)
-                onClicked contB    (forkEvalCont forkFlag stopFlag content st)
+                onClicked stepB    (forkEvalStep forkFlag content st)
+                onClicked contB    (forkEvalCont forkFlag content st)
                 onClicked breakB   (eval evalBreak   content st)
                 onClicked restartB (eval evalRestart content st)
                 onClicked cleanB   (eval evalClean   content st)
@@ -143,28 +142,21 @@ configEvalConsole = ask >>= \content -> get >>= \st -> io $ do
 
 evalStop :: GuiMonad ()
 evalStop = ask >>= \content -> io $ do
-           let stopFlag = content ^. gHalStopFlag
-               stopB    = content ^. (gHalCommConsole . cStopButton)
-           
-           active <- toggleButtonGetActive stopB
-           if active
-              then takeMVar stopFlag >> return ()
-              else putMVar  stopFlag ()
+            let stopFlag = content ^. gHalStopFlag
+                forkFlag = content ^. gHalForkFlag
+            
+            flagUpFlag <- io $ isEmptyMVar forkFlag
+            if flagUpFlag 
+               then return ()
+               else takeMVar stopFlag >> return ()
 
-forkEvalStep :: MVar () -> MVar () -> HGReader -> HGStateRef -> IO ()
-forkEvalStep fflag sflag content st = do
-                                flagUpStop <- fmap not $ isEmptyMVar sflag
-                                if flagUpStop
-                                    then forkS
-                                    else return ()
-    where
-        forkS :: IO ()
-        forkS = do
-                flagUpFork <- tryPutMVar fflag ()
-                if flagUpFork
-                    then forkIO (eval (evalStep >> return ()) content st >> 
-                                takeMVar fflag >> return ()) >> return ()
-                    else return ()
+forkEvalStep :: MVar () -> HGReader -> HGStateRef -> IO ()
+forkEvalStep fflag content st = do
+        flagUpFork <- tryPutMVar fflag ()
+        if flagUpFork
+            then forkIO (eval (evalStep >> return ()) content st >> 
+                        takeMVar fflag >> return ()) >> return ()
+            else return ()
 
 evalStep :: GuiMonad Bool
 evalStep = getHGState >>= \st -> do
@@ -358,22 +350,15 @@ updateStateView cleanAll prgSt =
                     (False,True)  ->lst ++ "\n" ++ 
                                     ("Estado final: " ++ show prgSt)
 
-forkEvalCont :: MVar () -> MVar () -> HGReader -> HGStateRef -> IO ()
-forkEvalCont fflag sflag content st = do
-                flagUpStop <- fmap not $ isEmptyMVar sflag
-                if flagUpStop
-                    then forkC
-                    else return ()
-    where
-        forkC :: IO ()
-        forkC = do
+forkEvalCont :: MVar () -> HGReader -> HGStateRef -> IO ()
+forkEvalCont fflag content st = do
                 flagUpFork <- tryPutMVar fflag ()
                 if flagUpFork 
                     then forkIO evalC >> return ()
                     else return ()
+    where
         evalC :: IO ()
-        evalC = readMVar sflag >> 
-                eval evalCont content st >> 
+        evalC = eval evalCont content st >> 
                 takeMVar fflag >>
                 return ()
 
@@ -383,7 +368,7 @@ evalCont = ask >>= \content -> do
         flagUpStop <- fmap not $ io $ isEmptyMVar stopFlag
         if flagUpStop
             then evalC
-            else return ()
+            else io $ putMVar stopFlag () >> return ()
     where
         evalC :: GuiMonad ()
         evalC = do

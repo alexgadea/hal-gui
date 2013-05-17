@@ -249,24 +249,26 @@ evalExtComm (ExtDo _ inv b c) = fix evalDo
 
 evalStepExtComm :: ExtComm -> ProgState (Maybe (Maybe ExtComm,Maybe ExtComm))
 evalStepExtComm (ExtSeq c c') = evalStepExtComm c >>= \mmcc' -> 
-        case mmcc' of
-            Nothing -> return Nothing
-            Just (Just c,Nothing)  -> return $ Just (Just c ,Just c')
-            Just (Just c,Just c'') -> return $ Just (Just c ,Just (ExtSeq c'' c'))
-            Just (Nothing,Just c)  -> return $ Just (Nothing,Just (ExtSeq c c'))
-evalStepExtComm wc@(ExtDo _ _ b c) = do
-                vb <- evalBExp b
-                case vb of
-                    Nothing    -> return Nothing
-                    Just True  -> return $ Just (Nothing,Just $ ExtSeq c wc)
-                    Just False -> return $ Just (Just wc,Nothing)
+    case mmcc' of
+        Nothing -> return Nothing
+        Just (Just c,Nothing)  -> return $ Just (Just c ,Just c')
+        Just (Just c,Just c'') -> return $ Just (Just c ,Just (ExtSeq c'' c'))
+        Just (Nothing,Just c)  -> return $ Just (Nothing,Just (ExtSeq c c'))
+evalStepExtComm wc@(ExtDo _ inv b c) = do
+        vb   <- evalBExp b
+        vinv <- evalExprFun inv
+        case (vb,vinv) of
+            (Nothing,_)    -> return Nothing
+            (_,Nothing)    -> return Nothing
+            (Just True,Just _)  -> return $ Just (Nothing,Just $ ExtSeq c wc)
+            (Just False,Just _) -> return $ Just (Just wc,Nothing)
 evalStepExtComm wc@(ExtIf _ b c c') = do
-                    vb <- evalBExp b
-                    case vb of
-                        Nothing    -> return Nothing
-                        Just True  -> return $ Just (Nothing,Just c)
-                        Just False -> return $ Just (Nothing,Just c')
+        vb <- evalBExp b
+        case vb of
+            Nothing    -> return Nothing
+            Just True  -> return $ Just (Nothing,Just c)
+            Just False -> return $ Just (Nothing,Just c')
 evalStepExtComm c = evalExtComm c >>= \m ->
-                    case m of
-                        Nothing -> return Nothing
-                        Just _  -> return (Just (Just c,Nothing))
+        case m of
+            Nothing -> return Nothing
+            Just _  -> return (Just (Just c,Nothing))
