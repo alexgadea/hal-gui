@@ -3,7 +3,7 @@ module HGUI.EvalConsole where
 import Graphics.UI.Gtk hiding (get)
 import Graphics.UI.Gtk.SourceView
 
-import Control.Monad (when,unless,forM)
+import Control.Monad (when,unless,forM,forM_)
 import qualified Control.Monad.Trans.Reader as R (ask)
 import Control.Monad.Trans.RWS 
 import qualified Control.Monad.Trans.State as ST (runStateT,evalStateT)
@@ -30,54 +30,94 @@ import HGUI.Evaluation.EvalState
 
 configEvalButton :: GuiMonad ()
 configEvalButton = ask >>= \content -> do
-                let ebutton = content ^. (gHalToolbar . evalButton)
-                
-                active <- io $ toggleToolButtonGetActive ebutton
-                if active 
-                   then onActive
-                   else onDeactive
+            let ebutton = content ^. (gHalToolbar . evalButton)
+            
+            active <- io $ toggleToolButtonGetActive ebutton
+            if active 
+                then onActive
+                else onDeactive
     where
         onDeactive :: GuiMonad ()
         onDeactive = ask >>= \content -> do
-                     let ebox  = content ^. (gHalCommConsole . cEvalBox)
-                         stbox = content ^. (gHalCommConsole . cEvalStateBox)
-                         tv    = content ^. gTextCode
-                     updateHGState ((<~) gHalConsoleState Nothing)
-                     
-                     cleanPaintLine $ castToTextView tv
-                     
-                     io $ textViewSetEditable tv True
-                     io $ widgetHideAll ebox
-                     io $ widgetHideAll stbox
+            let ebox      = content ^. (gHalCommConsole . cEvalBox)
+                evalstbox = content ^. (gHalCommConsole . cEvalStateBox)
+                tv        = content ^. gTextCode
+            updateHGState ((<~) gHalConsoleState Nothing)
+            
+            cleanPaintLine $ castToTextView tv
+            
+            io $ textViewSetEditable tv True
+            io $ widgetHideAll ebox
+            io $ widgetHideAll evalstbox
         
         onActive :: GuiMonad ()
         onActive = ask >>= \content -> do
-                   let ebox    = content ^. (gHalCommConsole . cEvalBox)
-                       stbox = content ^. (gHalCommConsole . cEvalStateBox)
-                       tv      = content ^. gTextCode
-                       ebutton = content ^. (gHalToolbar . evalButton)
-                   
-                   mprg <- compile'
-                   case mprg of
-                       Nothing -> io (toggleToolButtonSetActive ebutton False)
-                                  >> return ()
-                       Just prg -> do
-                                   let mExecState = Just $ makeExecState prg
-                                   
-                                   updateHGState ((<~) gHalConsoleState mExecState)
-                                   
-                                   startExecState mExecState
-                                   updateStateView True $ prgState $ makeExecState prg
-                                   
-                                   io $ textViewSetEditable tv False
-                                   io $ widgetShowAll ebox
-                                   io $ widgetShowAll stbox
+            let ebox      = content ^. (gHalCommConsole . cEvalBox)
+                evalstbox = content ^. (gHalCommConsole . cEvalStateBox)
+                tv        = content ^. gTextCode
+                ebutton   = content ^. (gHalToolbar . evalButton)
+            
+            mprg <- compile'
+            case mprg of
+                Nothing -> io (toggleToolButtonSetActive ebutton False)
+                            >> return ()
+                Just prg -> do
+                    let mExecState = Just $ makeExecState prg
+                        stbox      = content ^. (gHalCommConsole . cStateBox)
+                    
+                    updateHGState ((<~) gHalConsoleState mExecState)
+                    
+                    startExecState mExecState
+                    startStateView stbox $ prgState $ makeExecState prg
+                    
+                    io $ textViewSetEditable tv False
+                    io $ widgetShowAll ebox
+                    io $ widgetShowAll evalstbox
 
 startExecState :: Maybe ExecState -> GuiMonad ()
 startExecState Nothing   = return ()
 startExecState (Just st) = do
                            let headC = headNExecComm st
                            maybe (return ()) paintLine headC
+
+startStateView :: VBox -> State -> GuiMonad ()
+startStateView stBox st = io $ do
+            containerForall stBox (containerRemove stBox)
+            
+            mapM_ fillStBox $ takeIdentifiers st
+            
+            return ()
+    where
+        fillStBox :: Identifier -> IO ()
+        fillStBox i = do
+                hb <- hBoxNew False 2
+                vl <- labelNew $ Just $ show i ++ " ="
+                vl' <- labelNew $ Just "Sin valor"
+                boxPackStart hb vl PackNatural 2
+                boxPackStart hb vl' PackNatural 2
+                set vl [ miscXalign := 0 
+                       , miscXpad := 10
+                       ]
+                boxPackStart stBox hb PackNatural 2
+
+updateStateView :: Bool -> State -> GuiMonad ()
+updateStateView cleanAll prgSt = 
+                ask >>= \content -> getHGState >>= \st -> do
+                let stBox = content ^. (gHalCommConsole . cStateBox)
+                childs <- io $ containerGetChildren stBox
+                io $ postGUIAsync $ forM_ (zip childs (vars prgSt)) updateValue
+    where
+        updateValue :: (Widget,StateTuple) -> IO ()
+        updateValue (w,IntVar i mv) = do
+                let hb = castToHBox w
+                
+                childs <- containerGetChildren hb
+                
+                let lv  = castToLabel $ childs!!0
+                    lv' = castToLabel $ childs!!1
+                
+                labelSetText lv  $ show i ++ " ="
+                labelSetText lv' $ maybe "Sin Valor" show mv
 
 cleanPaintLine :: TextView -> GuiMonad ()
 cleanPaintLine = io . cleanPaintLineIO
@@ -327,29 +367,6 @@ takeInputs prgSt flagSt = ask >>= \content ->
                 formatErrorMsg :: String -> String
                 formatErrorMsg msg = "<span foreground=\"red\">"++msg++"</span>"
 
-updateStateView :: Bool -> State -> GuiMonad ()
-updateStateView cleanAll prgSt = 
-                        ask >>= \content -> getHGState >>= \st -> do
-                        let evalL   = content ^. (gHalCommConsole . cEvalLabel)
-                            Just execSt = st ^. gHalConsoleState
-                            isFinal = not $ isJust $ nexecutedTracePrg execSt
-                        io $ postGUIAsync $ do
-                            lst <- if cleanAll 
-                                      then return ""
-                                      else labelGetText evalL
-                            labelSetText evalL $ formatSt lst isFinal 
-    where
-        formatSt :: String -> Bool -> String
-        formatSt lst isFinal = 
-                let linesSt = lines lst
-                in
-                case (null linesSt,isFinal) of
-                    (True,_)      -> "Estado inicial: "++show prgSt
-                    (False,False) -> lst ++ "\n" ++ 
-                                    (show (length linesSt) ++ ": " ++ show prgSt)
-                    (False,True)  ->lst ++ "\n" ++ 
-                                    ("Estado final: " ++ show prgSt)
-
 forkEvalCont :: MVar () -> HGReader -> HGStateRef -> IO ()
 forkEvalCont fflag content st = do
                 flagUpFork <- tryPutMVar fflag ()
@@ -472,4 +489,3 @@ compile' = get >>= \ref -> ask >>= \content ->
             Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
                          printInfoMsg "Programa compilado con exito." >>
                          return (Just prg)
-                         

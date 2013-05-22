@@ -63,8 +63,8 @@ makeGState xml = do
         infoTV <- builderGetObject xml castToTextView "infoConsoleTView"
         
         evalBox      <- builderGetObject xml castToVBox "evalBox"
-        evalStateBox <- builderGetObject xml castToVBox "stateBox"
-        evalL        <- builderGetObject xml castToLabel "evalLabel"
+        evalStateBox <- builderGetObject xml castToVBox "evalStateBox"
+        stateBox     <- builderGetObject xml castToVBox "stateBox"
         evalB        <- builderGetObject xml castToToggleToolButton "evalButton"
         
         stepB    <- builderGetObject xml castToButton "stepButton"
@@ -90,7 +90,7 @@ makeGState xml = do
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
-            halCommConsole = HalCommConsole evalBox evalStateBox evalL 
+            halCommConsole = HalCommConsole evalBox evalStateBox stateBox
                                             stepB contB breakB restartB 
                                             cleanB stopB
         
