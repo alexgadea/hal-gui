@@ -108,7 +108,10 @@ updateStateView cleanAll prgSt =
                 io $ postGUIAsync $ forM_ (zip childs (vars prgSt)) updateValue
     where
         updateValue :: (Widget,StateTuple) -> IO ()
-        updateValue (w,IntVar i mv) = do
+        updateValue (w,BoolVar i mv) = updateValue' w i mv
+        updateValue (w,IntVar  i mv) = updateValue' w i mv
+        updateValue' :: Show a => Widget -> Identifier -> Maybe a -> IO ()
+        updateValue' w i mv = do
                 let hb = castToHBox w
                 
                 childs <- containerGetChildren hb

@@ -60,7 +60,7 @@ extAssignBool = try $ do
                 st <- getParserState
                 let initp = statePos st
                 
-                acc <- pintvar  
+                acc <- pboolvar  
                 oper ":="
                 bexp <- boolexp 
                 
