@@ -40,6 +40,11 @@ addBreak execSt b = if b  `elem`   (getValidLines execSt)
                        then Just $ execSt {prgBreaks = b : prgBreaks execSt}
                        else Nothing
 
+delBreak :: ExecState -> Int -> Maybe ExecState
+delBreak execSt b = if b  `elem`   (getValidLines execSt)
+                       then Just $ execSt {prgBreaks = filter (b/=) $ prgBreaks execSt}
+                       else Nothing
+
 getValidLines :: ExecState -> [Int]
 getValidLines (ExecState mc mc' _ _) = case (mc,mc') of
                                            (Nothing,Nothing) -> []

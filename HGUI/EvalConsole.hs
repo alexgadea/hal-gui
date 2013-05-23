@@ -3,7 +3,7 @@ module HGUI.EvalConsole where
 import Graphics.UI.Gtk hiding (get)
 import Graphics.UI.Gtk.SourceView
 
-import Control.Monad (when,unless,forM,forM_)
+import Control.Monad (when,unless,forM,forM_,void)
 import qualified Control.Monad.Trans.Reader as R (ask)
 import Control.Monad.Trans.RWS 
 import qualified Control.Monad.Trans.State as ST (runStateT,evalStateT)
@@ -411,37 +411,44 @@ evalCont = ask >>= \content -> do
 
 evalBreak :: GuiMonad ()
 evalBreak = ask >>= \content -> getHGState >>= \st -> do
-            let textV  = content ^. gTextCode
+            let textV       = content ^. gTextCode
                 Just execSt = st ^. gHalConsoleState
             
             buf  <- io $ textViewGetBuffer textV
             mark <- io $ textBufferGetInsert buf
             iter <- io $ textBufferGetIterAtMark buf mark
-            i <- io $ textIterGetLine iter
+            i    <- io $ textIterGetLine iter
             
-            gutter    <- io $ sourceViewGetGutter textV TextWindowLeft
-            existMark <- delMarkBreak gutter buf i
-            when existMark $
-               case addBreak execSt (i+1) of
-                   Nothing -> return ()
-                   Just execSt' -> do
-                        addMarkBreak buf iter
-                        updateHGState ((<~) gHalConsoleState (Just $ execSt'))
+            gutter <- io $ sourceViewGetGutter textV TextWindowLeft
+            marks  <- getMark gutter buf i
+            
+            if null marks
+               then case addBreak execSt (i+1) of
+                        Nothing -> return ()
+                        Just execSt' -> do
+                            addMarkBreak buf iter
+                            updateHGState ((<~) gHalConsoleState (Just $ execSt'))
+               else case delBreak execSt (i+1) of
+                        Nothing -> return ()
+                        Just execSt' -> do
+                            delMarkBreak buf marks
+                            io $ sourceGutterQueueDraw gutter
+                            updateHGState ((<~) gHalConsoleState (Just $ execSt'))
     where
-        delMarkBreak :: SourceGutter -> TextBuffer -> Int -> GuiMonad Bool
-        delMarkBreak gutter buf i = io $ do
-                let sbuf = (castToSourceBuffer buf)
-                marks <- sourceBufferGetSourceMarksAtLine sbuf i breakMark
+        getMark :: SourceGutter -> TextBuffer -> Int -> GuiMonad [SourceMark]
+        getMark gutter buf i = io $ do
+                let sbuf = castToSourceBuffer buf
+                sourceBufferGetSourceMarksAtLine sbuf i breakMark
+        delMarkBreak :: TextBuffer -> [SourceMark] -> GuiMonad ()
+        delMarkBreak buf marks = io $ do
+                let sbuf = castToSourceBuffer buf
                 mapM_ (delMark sbuf) marks
-                sourceGutterQueueDraw gutter
-                return $ null marks
         addMarkBreak :: TextBuffer -> TextIter -> GuiMonad ()
-        addMarkBreak buf iter = io $ do
+        addMarkBreak buf iter = io $ void $ 
                 sourceBufferCreateSourceMark (castToSourceBuffer buf) 
                                              Nothing
                                              breakMark 
                                              iter
-                return ()
 
 evalRestart :: GuiMonad ()
 evalRestart = ask >>= \content -> getHGState >>= \st -> do
