@@ -160,16 +160,18 @@ addValue :: Identifier -> Either Bool Int -> State -> State
 addValue i (Left v) st  = st {vars = (vars st)++[BoolVar i $ Just v]}
 addValue i (Right v) st = st {vars = (vars st)++[IntVar i $ Just v]}
 
-evalExprFun :: FormFun -> ProgState (Maybe ())
-evalExprFun (Expr f) = if PExpr.preExprIsQuant f then return (Just ())
+evalExprFun :: FormFun -> Bool -> ProgState (Maybe ())
+evalExprFun (Expr f) isPre = 
+                       if PExpr.preExprIsQuant f then return (Just ())
                        else do
                        (st,win) <- ST.get
                        let funExpr = Fun.eval (makeEnv st) f
                        if Expr funExpr == FOL.true
-                           then return $ Just ()
+                       then return $ Just ()
                        else if Expr funExpr == FOL.false
-                           then liftIO (showErrMsg win guardFalseMsg) >> 
-                                return Nothing
+                       then liftIO (showErrMsg win guardFalseMsg) >>
+                            if isPre then return (Just ())
+                                     else return Nothing
                        else liftIO (showErrMsg win guardTypeErrorMsg) >> 
                             return Nothing
     where
@@ -208,7 +210,8 @@ evalExtComm :: ExtComm -> ProgState (Maybe ())
 evalExtComm (ExtSkip _) = return $ Just ()
 evalExtComm (ExtAbort _) = ST.get >>= \(_,win) -> 
                            liftIO (showErrMsg win abortMsg) >> return Nothing
-evalExtComm (ExtAssert _ b) = evalExprFun b
+evalExtComm (ExtAssert _ b) = evalExprFun b False
+evalExtComm (ExtPre _ f) = evalExprFun f True
 evalExtComm (ExtIf _ b c c') = evalBExp b >>= \vb ->
                     case vb of
                         Nothing    -> return Nothing
@@ -254,7 +257,7 @@ evalStepExtComm (ExtSeq c c') = evalStepExtComm c >>= \mmcc' ->
         Just (Nothing,Just c)  -> return $ Just (Nothing,Just (ExtSeq c c'))
 evalStepExtComm wc@(ExtDo _ inv b c) = do
         vb   <- evalBExp b
-        vinv <- evalExprFun inv
+        vinv <- evalExprFun inv False
         case (vb,vinv) of
             (Nothing,_)    -> return Nothing
             (_,Nothing)    -> return Nothing

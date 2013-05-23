@@ -117,7 +117,7 @@ extWhile = try $ do
            return (ExtDo (makeCommPos initp endp) form b c)
 
 -- | Precondición
-extPrec :: ParserH (CommPos,FormFun)
+extPrec :: ParserH ExtComm
 extPrec = try $ do
           st <- getParserState
           let initp = statePos st
@@ -133,7 +133,7 @@ extPrec = try $ do
           
           st <- getParserState
           let endp = statePos st
-          return (makeCommPos initp endp, Equ.Expr e)
+          return $ ExtPre (makeCommPos initp endp) (Equ.Expr e)
 
 -- | Precondición
 extPost :: ParserH (CommPos,FormFun)

@@ -28,13 +28,13 @@ makeExecState (ExtProg vars pre comms post) = ExecState Nothing
                                                         []
 
 makeExecStateWithPre :: ExtProgram -> ExecState
-makeExecStateWithPre (ExtProg vars (pos,pre) comms post) = 
-        ExecState Nothing (Just $ ExtSeq (ExtAssert pos pre) comms) 
+makeExecStateWithPre (ExtProg vars pre comms post) = 
+        ExecState Nothing (Just $ ExtSeq pre comms) 
                           (fillState initState vars) [] []
 
 restartExecSt :: ExecState -> ExtProgram -> ExecState
-restartExecSt (ExecState _ _ st _ _) (ExtProg _ (pos,pre) c _) = 
-    ExecState Nothing (Just $ ExtSeq (ExtAssert pos pre) c) 
+restartExecSt (ExecState _ _ st _ _) (ExtProg _ pre c _) = 
+    ExecState Nothing (Just $ ExtSeq pre c) 
                       (fillState initState $ takeIdentifiers st) [] []
 
 undoUpdateExecState :: ExecState -> ExtComm -> HistState -> State -> ExecState

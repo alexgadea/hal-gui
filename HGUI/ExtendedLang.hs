@@ -22,6 +22,7 @@ initPos = CommPos (initialPos "") (initialPos "")
 takeCommLine :: ExtComm -> Int
 takeCommLine (ExtSkip   pos)       = sourceLine $ begin pos
 takeCommLine (ExtAbort  pos)       = sourceLine $ begin pos
+takeCommLine (ExtPre    pos _)     = sourceLine $ begin pos
 takeCommLine (ExtAssert pos _)     = sourceLine $ begin pos
 takeCommLine (ExtIf     pos _ _ _) = sourceLine $ begin pos
 takeCommLine (ExtIAssig pos _ _)   = sourceLine $ begin pos
@@ -42,6 +43,7 @@ data ExtComm where
     ExtSkip   :: CommPos -> ExtComm
     ExtAbort  :: CommPos -> ExtComm
     
+    ExtPre    :: CommPos -> FormFun -> ExtComm
     ExtAssert :: CommPos -> FormFun -> ExtComm
     
     ExtIf     :: CommPos -> BExp -> ExtComm -> ExtComm -> ExtComm
@@ -54,7 +56,7 @@ data ExtComm where
     deriving Show
 
 data ExtProgram where
-    ExtProg :: LIdentifier -> (CommPos,FormFun) -> 
+    ExtProg :: LIdentifier -> ExtComm -> 
                               ExtComm -> 
                               (CommPos,FormFun) -> ExtProgram
 
@@ -64,15 +66,16 @@ extProgramGetExtComm (ExtProg _ _ c _) = c
 convertExtCommToComm :: ExtComm -> Comm
 convertExtCommToComm (ExtSkip _) = Skip
 convertExtCommToComm (ExtAbort _) = Abort
+convertExtCommToComm (ExtPre _ f) = Assert f
 convertExtCommToComm (ExtAssert _ f) = Assert f
 convertExtCommToComm (ExtIf _ b c c') = If b (convertExtCommToComm c)
-                                           (convertExtCommToComm c')
+                                             (convertExtCommToComm c')
 convertExtCommToComm (ExtIAssig _ a e) = IAssig a e
 convertExtCommToComm (ExtBAssig _ a e) = BAssig a e
 convertExtCommToComm (ExtDo _ i b c) = Do i b (convertExtCommToComm c)
 convertExtCommToComm (ExtSeq c c') = Seq (convertExtCommToComm c)
-                                       (convertExtCommToComm c')
+                                         (convertExtCommToComm c')
 
 convertExtProgToProg :: ExtProgram -> Program
-convertExtProgToProg (ExtProg vars (_,pre) ecomms (_,pos)) = 
+convertExtProgToProg (ExtProg vars (ExtPre _ pre) ecomms (_,pos)) = 
                          Prog vars pre (convertExtCommToComm ecomms) pos
