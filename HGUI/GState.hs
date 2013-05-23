@@ -61,8 +61,10 @@ $(mkLenses ''HalInfoConsole)
 data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
                                      , _cEvalStateBox  :: VBox
                                      , _cStateBox      :: VBox
-                                     , _cStepButton    :: Button
+                                     , _cStepUButton   :: Button
+                                     , _cStepDButton   :: Button
                                      , _cContButton    :: Button
+                                     , _cExecButton    :: Button
                                      , _cBreakButton   :: Button
                                      , _cRestartButton :: Button
                                      , _cCleanButton   :: Button
@@ -79,31 +81,31 @@ $(mkLenses ''HalEditorPaned)
 -- otro thread.
 -- Con StopFlag restringimos el avance de la evaluación, la idea principal
 -- es parar cualquier ejecución que no tenga final.
-data HGReader = HGReader { _gHalToolbar         :: HalToolbar
-                         , _gHalSymbolList      :: HalSymList
-                         , _gHalAxList          :: HalAxList
-                         , _gHalEditorPaned     :: HalEditorPaned
-                         , _gHalWindow          :: Window
-                         , _gHalInfoConsole     :: HalInfoConsole
-                         , _gTextCode           :: SourceView
-                         , _gTextVerif          :: SourceView
-                         , _gInfoConsole        :: TextView
-                         , _gHalCommConsole     :: HalCommConsole
-                         , _gHalForkFlag        :: MVar ()
-                         , _gHalStopFlag        :: MVar ()
+data HGReader = HGReader { _gHalToolbar     :: HalToolbar
+                         , _gHalSymbolList  :: HalSymList
+                         , _gHalAxList      :: HalAxList
+                         , _gHalEditorPaned :: HalEditorPaned
+                         , _gHalWindow      :: Window
+                         , _gHalInfoConsole :: HalInfoConsole
+                         , _gTextCode       :: SourceView
+                         , _gTextVerif      :: SourceView
+                         , _gInfoConsole    :: TextView
+                         , _gHalCommConsole :: HalCommConsole
+                         , _gHalForkFlag    :: MVar ()
+                         , _gHalStopFlag    :: MVar ()
                          }
 $(mkLenses ''HGReader)
 
 -- | Tipo de mónada de estado, llevamos el environment de un modulo bien 
 -- chequeado y la info sobre la parte derecha de la interfaz, es decir, 
 -- la que contiene los campos de texto para escribir programas.
-data HGState = HGState { -- _gHalTextPage       :: HalTextPage,
-                         _gHalConsoleState   :: Maybe ExecState
-                       , _gHalPrg            :: Maybe ExtProgram
-                       , _gCurrentText       :: SourceView
+data HGState = HGState { _gHalConsoleState :: Maybe ExecState
+                       , _gHalPrg          :: Maybe ExtProgram
+                       , _gCurrentText     :: SourceView
                        -- El siguiente campo es el nombre del archivo sin la extensión.
                        -- Un archivo de Hal consistira de uno .lisa y uno .fun
-                       , _gFileName      :: Maybe FilePath
+                       , _gFileName        :: Maybe FilePath
+                       , _gForkThread      :: Maybe ThreadId
                        }
 $(mkLenses ''HGState)
 

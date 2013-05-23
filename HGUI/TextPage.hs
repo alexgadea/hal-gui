@@ -65,7 +65,6 @@ configScrolledWindow sw =
                    , scrolledWindowVscrollbarPolicy := PolicyAlways
                    ]
 
-
 -- | Crea un campo de texto y lo llena, de ser posible, con el string.
 createSourceView :: LangInfo -> IO SourceView
 createSourceView langi = do
@@ -79,7 +78,6 @@ createSourceView langi = do
             
             return sourceview
 
-            
 configText :: VBox -> SourceView -> IO ()
 configText box sv = 
         do
@@ -91,8 +89,6 @@ configText box sv =
             containerAdd box swindow
             
             widgetShowAll box
-
-
 
 createTextPage :: Maybe String -> GuiMonad ()
 createTextPage mcode = ask >>= \content -> do

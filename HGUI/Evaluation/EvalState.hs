@@ -5,16 +5,18 @@ import Graphics.UI.Gtk (Window)
 
 import Control.Monad.Trans.State (StateT)
 
-
 -- Imports de Hal
 import Hal.Lang
 
 -- Imports de Hal-Gui
 import HGUI.ExtendedLang
 
+type HistState = [(ExtComm,State)]
+
 data ExecState = ExecState { executedTracePrg  :: Maybe ExtComm
                            , nexecutedTracePrg :: Maybe ExtComm
                            , prgState          :: State
+                           , hPrgState         :: HistState
                            , prgBreaks         :: [Int]
                            }
 
@@ -23,22 +25,38 @@ makeExecState (ExtProg vars pre comms post) = ExecState Nothing
                                                         (Just comms)
                                                         (fillState initState vars)
                                                         []
+                                                        []
 
 makeExecStateWithPre :: ExtProgram -> ExecState
 makeExecStateWithPre (ExtProg vars (pos,pre) comms post) = 
         ExecState Nothing (Just $ ExtSeq (ExtAssert pos pre) comms) 
-                          (fillState initState vars) []
+                          (fillState initState vars) [] []
 
 restartExecSt :: ExecState -> ExtProgram -> ExecState
-restartExecSt (ExecState _ _ st _) (ExtProg _ _ c _) = 
-    ExecState Nothing (Just c) (fillState initState $ takeIdentifiers st) []
+restartExecSt (ExecState _ _ st _ _) (ExtProg _ (pos,pre) c _) = 
+    ExecState Nothing (Just $ ExtSeq (ExtAssert pos pre) c) 
+                      (fillState initState $ takeIdentifiers st) [] []
 
-updateExecState :: ExecState -> (Maybe ExtComm,Maybe ExtComm) -> State -> ExecState
-updateExecState execSt (mc,mc') st = 
+undoUpdateExecState :: ExecState -> ExtComm -> HistState -> State -> ExecState
+undoUpdateExecState execSt c hprgst st = 
+        case execSt of
+            ExecState mc (Just c') _ _ bs ->
+                ExecState mc (Just $ ExtSeq c c') st hprgst bs
+            ExecState mc Nothing _ _ bs ->
+                ExecState mc (Just $ c) st hprgst bs
+
+updateExecState :: ExecState -> (Maybe ExtComm,Maybe ExtComm) -> State -> 
+                   State -> ExecState
+updateExecState execSt (mc,mc') oldst st = 
         case (execSt,mc) of
-            (ExecState Nothing _ _ bs,_) -> ExecState mc mc' st bs
-            (ExecState (Just exec) _ _ bs,Just c) -> ExecState (Just $ ExtSeq exec c) mc' st bs
-            (ExecState (Just exec) _ _ bs,Nothing) -> ExecState (Just exec) mc' st bs
+            (ExecState Nothing _ _ hstprg bs,Nothing) -> 
+                    ExecState mc mc' st hstprg bs
+            (ExecState Nothing _ _ hstprg bs,Just c) -> 
+                    ExecState mc mc' st ((c,oldst):hstprg) bs
+            (ExecState (Just exec) _ _ hstprg bs,Just c) -> 
+                    ExecState (Just $ ExtSeq exec c) mc' st ((c,oldst):hstprg) bs
+            (ExecState (Just exec) _ _ hstprg bs,Nothing) -> 
+                    ExecState (Just exec) mc' st hstprg bs
 
 addBreak :: ExecState -> Int -> Maybe ExecState
 addBreak execSt b = if b  `elem`   (getValidLines execSt)
@@ -51,7 +69,7 @@ delBreak execSt b = if b  `elem`   (getValidLines execSt)
                        else Nothing
 
 getValidLines :: ExecState -> [Int]
-getValidLines (ExecState mc mc' _ _) = case (mc,mc') of
+getValidLines (ExecState mc mc' _ _ _) = case (mc,mc') of
                                            (Nothing,Nothing) -> []
                                            (Just c,Nothing)  -> getCommLines c
                                            (Nothing,Just c') -> getCommLines c'
@@ -60,8 +78,8 @@ getValidLines (ExecState mc mc' _ _) = case (mc,mc') of
                                                                 getCommLines c'
 
 headNExecComm :: ExecState -> Maybe ExtComm
-headNExecComm (ExecState _ Nothing _ _)      = Nothing
-headNExecComm (ExecState _ (Just comms) _ _) = Just $ takeHead comms
+headNExecComm (ExecState _ Nothing _ _ _)      = Nothing
+headNExecComm (ExecState _ (Just comms) _ _ _) = Just $ takeHead comms
     where
         takeHead :: ExtComm -> ExtComm
         takeHead (ExtSeq c c') = takeHead c

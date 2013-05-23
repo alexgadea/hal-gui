@@ -29,7 +29,7 @@ getCode tv = ask >>= \content -> io $
         start     <- textBufferGetStartIter buf
         end       <- textBufferGetEndIter buf
         textBufferGetText buf start end False
-        
+
 -- | Inserta un string al final de un text buffer y scrollea el text view.
 --   Retorna el iter inicial y final del texto ingresado
 putStrAtEnd :: TextBuffer -> TextView -> String -> IO ()
@@ -53,7 +53,6 @@ setLoadedModuleInfo label Nothing = labelSetText label "Error al cargar el módu
 setLoadedModuleInfo label (Just mod) = styleInfoModule >>= widgetModifyFont label >>
                                        labelSetText label mod
 
-
 -- -- | Estilo para títulos en info-boxes
 styleInfoModule ::  IO (Maybe FontDescription)
 styleInfoModule = Just <$> fontBold
@@ -70,4 +69,3 @@ fontBold :: IO FontDescription
 fontBold = fontDescriptionNew >>= \fd -> 
            fontDescriptionSetWeight fd WeightBold >>
            return fd
-

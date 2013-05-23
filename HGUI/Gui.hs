@@ -67,8 +67,10 @@ makeGState xml = do
         stateBox     <- builderGetObject xml castToVBox "stateBox"
         evalB        <- builderGetObject xml castToToggleToolButton "evalButton"
         
-        stepB    <- builderGetObject xml castToButton "stepButton"
+        stepUB   <- builderGetObject xml castToButton "stepUpButton"
+        stepDB   <- builderGetObject xml castToButton "stepDownButton"
         contB    <- builderGetObject xml castToButton "contButton"
+        execB    <- builderGetObject xml castToButton "execButton"
         breakB   <- builderGetObject xml castToButton "breakButton"
         restartB <- builderGetObject xml castToButton "restartButton"
         cleanB   <- builderGetObject xml castToButton "cleanButton"
@@ -91,13 +93,14 @@ makeGState xml = do
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
             halCommConsole = HalCommConsole evalBox evalStateBox stateBox
-                                            stepB contB breakB restartB 
-                                            cleanB stopB
+                                            stepUB stepDB contB execB breakB 
+                                            restartB cleanB stopB
         
         gState <- newRef $ 
                       HGState Nothing
                               Nothing
                               textcode
+                              Nothing
                               Nothing
                               
         let gReader = HGReader halToolbarST
@@ -163,15 +166,20 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
 
 -- | Configura la ventana principal.
 configWindow :: GuiMonad ()
-configWindow = ask >>= \content -> 
+configWindow = ask >>= \content -> get >>= \stref ->
             io $ do
-            let window = content ^. gHalWindow
+            let window   = content ^. gHalWindow
+            
             windowMaximize window
             widgetShowAll window
-            onDestroy window mainQuit
+            onDestroy window $ mainQuit >> forkQuit stref
             return ()
+    where
+        forkQuit :: HGStateRef -> IO ()
+        forkQuit stref = readRef stref >>= \st ->
+            let mthreadId = st ^. gForkThread in
+            maybe (return ()) killThread mthreadId
 
-            
 eventsSourceView :: GuiMonad ()
 eventsSourceView = ask >>= \content ->
                    get >>= \st ->

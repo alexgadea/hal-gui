@@ -203,9 +203,6 @@ evalExprFun (Expr f) = if PExpr.preExprIsQuant f then return (Just ())
         makeIntVal (n+1) = let Expr n' = Arith.successor (Expr $ makeIntVal n) 
                            in n'
 
-        
---type EvalEnv = M.Map Variable ([Variable],PreExpr)
-        
 -- | Evaluador de los comandos.
 evalExtComm :: ExtComm -> ProgState (Maybe ())
 evalExtComm (ExtSkip _) = return $ Just ()
@@ -229,7 +226,6 @@ evalExtComm (ExtIAssig _ a e) = do
                         return $ Just ()
 evalExtComm (ExtBAssig _ a e) = do 
             mevalE <- evalBExp e
-            
             case mevalE of
                 Nothing -> return Nothing
                 Just evalE -> do
