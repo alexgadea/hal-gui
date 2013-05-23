@@ -42,7 +42,9 @@ configEvalButton = ask >>= \content -> do
             let ebox      = content ^. (gHalCommConsole . cEvalBox)
                 evalstbox = content ^. (gHalCommConsole . cEvalStateBox)
                 tv        = content ^. gTextCode
+            
             updateHGState ((<~) gHalConsoleState Nothing)
+            updateHGState ((<~) gHalPrg Nothing)
             
             cleanPaintLine $ castToTextView tv
             
@@ -62,13 +64,13 @@ configEvalButton = ask >>= \content -> do
                 Nothing -> io (toggleToolButtonSetActive ebutton False)
                             >> return ()
                 Just prg -> do
-                    let mExecState = Just $ makeExecState prg
+                    let mExecState = Just $ makeExecStateWithPre prg
                         stbox      = content ^. (gHalCommConsole . cStateBox)
                     
                     updateHGState ((<~) gHalConsoleState mExecState)
                     
                     startExecState mExecState
-                    startStateView stbox $ prgState $ makeExecState prg
+                    startStateView stbox $ prgState $ makeExecStateWithPre prg
                     
                     io $ textViewSetEditable tv False
                     io $ widgetShowAll ebox
@@ -207,7 +209,6 @@ evalStep = getHGState >>= \st -> do
         prgSt       = prgState execSt
         mexecComm   = executedTracePrg execSt
         mnexecComm  = nexecutedTracePrg execSt
-    
     flagSt <- io $ newEmptyMVar
     
     maybe (takeInputs prgSt flagSt)

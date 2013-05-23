@@ -182,9 +182,11 @@ evalExprFun (Expr f) = if PExpr.preExprIsQuant f then return (Just ())
         makeEFunVar :: Fun.EvalEnv -> Identifier -> Maybe Int -> Fun.EvalEnv
         makeEFunVar env i (Just v) = 
                             Map.insert (makeVar i) ([],(makeIntVal v)) env
+        makeEFunVar env _ _ = env
         makeBFunVar :: Fun.EvalEnv -> Identifier -> Maybe Bool -> Fun.EvalEnv
         makeBFunVar env i (Just v) = 
                             Map.insert (makeVar i) ([],(makeBoolVal v)) env
+        makeBFunVar env _ _ = env
         
         makeVar :: Identifier -> Variable
         makeVar i = PExpr.var (idName i) (makeType i)
