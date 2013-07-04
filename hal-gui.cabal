@@ -23,7 +23,7 @@ Executable hal-gui
     HS-Source-Dirs: .
     Main-is: HGUI/Main.hs
     GHC-options: -Odph -Wall -threaded
-    Build-depends:       base, hal, fun-gui, containers >= 0.4, reference >= 0.1, 
+    Build-depends:       base, hal, fun, containers >= 0.4, reference >= 0.1, 
                          text >= 0.11.1.5, glade >= 0.12.1, gtk >= 0.12.1, 
                          equ >= 0.2, bytestring >= 0.9.1.10, cereal >= 0.3.3.0,
                          glib >= 0.12.1, filepath >= 1.2.0.0, strict >= 0.3.2,

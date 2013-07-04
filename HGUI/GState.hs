@@ -3,8 +3,6 @@
 
 module HGUI.GState where
 
-import qualified GUI.GState as GStateFun (GReader,GStateRef,gFunWindow)
-
 import Lens.Family
 import Lens.Family.TH
 
