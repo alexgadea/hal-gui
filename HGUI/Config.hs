@@ -5,6 +5,10 @@ import Graphics.UI.Gtk
 
 -- Para definir el lenguaje del resaltado
 
+languageSpecFolder, languageSpecFunFile, anotherLanguage :: String
+textStylesFolder, textStyleFileFun, funMimeType :: String
+languageSpecHalFile, textStyleFileHal, halMimeType :: String
+
 languageSpecFolder = "HGUI/sourceview/language-specs"
 
 languageSpecFunFile = languageSpecFolder ++ "/fun.lang"
@@ -30,8 +34,10 @@ data LangInfo = LangInfo {
                   , langName :: String
 }
 
+funLangInfo :: LangInfo
 funLangInfo = LangInfo languageSpecFunFile textStyleFileFun funMimeType "fun"
 
+halLangInfo :: LangInfo
 halLangInfo = LangInfo languageSpecHalFile textStyleFileHal halMimeType "lisa"
 
 breakMark :: String
@@ -62,6 +68,8 @@ evalLineColour = "#ee351de96116"
 
 funIdentWidth :: Int
 funIdentWidth = 4
+
+spacesInsteadTab, setIndentOnTab, autoIdent :: Bool
 spacesInsteadTab = True
 setIndentOnTab = True
 autoIdent = True

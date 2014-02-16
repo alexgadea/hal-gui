@@ -12,23 +12,21 @@ import Graphics.UI.Gtk.SourceView
 import Data.Text(unpack,pack)
 import Data.Tree
 
-import Lens.Family
-
-import Control.Monad(when,unless)
+import Control.Lens hiding (set)
+import Control.Monad(unless)
 import Control.Monad.Trans.RWS (evalRWST,ask,get)
 import qualified Data.Foldable as F (mapM_) 
 
 import HGUI.GState
-import HGUI.Utils
 
 type AxiomItem = (String,Maybe Basic)
 
 -- | Genera el TreeStore con la lista de axiomas.
 listAxioms :: IO (TreeStore AxiomItem)
-listAxioms = treeStoreNew $ forest ET.axiomGroup ++ forest eval
+listAxioms = treeStoreNew $ forest ET.axiomGroup ++ forest laEval
     where 
-        eval :: ET.Grouped Basic
-        eval = [(pack "Aritmética", [Evaluate])]
+        laEval :: ET.Grouped Basic
+        laEval = [(pack "Aritmética", [Evaluate])]
 
         forest ::  (Truth t, Show t) => ET.Grouped t -> Forest AxiomItem
         forest = ET.toForest (\t -> (unpack t,Nothing)) addItem
@@ -59,9 +57,9 @@ configAxiomList = do
             list <- io relationListStore
             setupComboRel axr list
             
-            list <- io listAxioms
-            io $ setupAxiomList tv list
-            eventsAxiomList tv list
+            list' <- io listAxioms
+            io $ setupAxiomList tv list'
+            eventsAxiomList tv list'
             io $ widgetHideAll af
             
             return ()
@@ -88,12 +86,12 @@ eventsAxiomList tv list =
             treeSelectionUnselectAll tree >>
             treeViewSetModel tv list >> widgetShowAll tv >> return tree) 
             >>= \tree -> ask >>= \content -> get >>= \st ->
-            io (onSelectionChanged tree (eval (showAxiom list tree) content st))
+            io (onSelectionChanged tree (eeval (showAxiom list tree) content st))
             >> 
-            io (tv `on` rowActivated $ \path _ -> eval (putOnText list path) content st) >>
+            io (tv `on` rowActivated $ \path _ -> eeval (putOnText list path) content st) >>
             return ()
     where
-        eval action content st = evalRWST action content st >> return ()
+        eeval action content st = evalRWST action content st >> return ()
 
 
 putOnText :: TreeStore AxiomItem -> TreePath -> GuiMonad ()
@@ -105,9 +103,9 @@ putOnText list path =
         justification :: [Relation] -> Int -> String -> String
         justification rs i j = (unpack $ relRepr (rs!!i)) ++ " { " ++ j ++ " }"
         configSelection :: TreePath -> SourceView -> GuiMonad ()
-        configSelection path tv = ask >>= \content -> 
+        configSelection tpath tv = ask >>= \content -> 
                 return (content ^. (gHalAxList . gAxRel)) >>= \axRel ->
-                io (treeStoreGetValue list path) >>= \(ax,_) ->
+                io (treeStoreGetValue list tpath) >>= \(ax,_) ->
                 io (relationListStore) >>= \lsrel ->
                 io (listStoreToList lsrel) >>= \l ->
                 io (comboBoxGetActive axRel) >>= \i ->

@@ -3,21 +3,19 @@ module HGUI.EvalConsole where
 import Graphics.UI.Gtk hiding (get)
 import Graphics.UI.Gtk.SourceView
 
-import Control.Monad (when,unless,forM,forM_,void)
-import qualified Control.Monad.Trans.Reader as R (ask)
+import Control.Lens hiding (set)
 import Control.Monad.Trans.RWS 
+import Control.Monad (forM,forM_,void)
 import qualified Control.Monad.Trans.State as ST (runStateT,evalStateT)
 
 import Control.Concurrent
-
-import Lens.Family
 
 import Data.Maybe
 import Data.Text (unpack)
 import Data.Reference
 
 import Hal.Parser
-import Hal.Lang (Identifier (..), IdType (..), Type (..))
+import Hal.Lang (Identifier (..), Type (..))
 
 import HGUI.ExtendedLang
 import HGUI.Config
@@ -44,8 +42,8 @@ configEvalButton = ask >>= \content -> do
                 tv        = content ^. gTextCode
                 mthreadId  = st ^. gForkThread
             
-            updateHGState ((<~) gHalConsoleState Nothing)
-            updateHGState ((<~) gHalPrg Nothing)
+            updateHGState ((.~) gHalConsoleState Nothing)
+            updateHGState ((.~) gHalPrg Nothing)
             io $ maybe (return ()) killThread mthreadId
             
             cleanPaintLine $ castToTextView tv
@@ -69,7 +67,7 @@ configEvalButton = ask >>= \content -> do
                     let mExecState = Just $ makeExecStateWithPre prg
                         stbox      = content ^. (gHalCommConsole . cStateBox)
                     
-                    updateHGState ((<~) gHalConsoleState mExecState)
+                    updateHGState ((.~) gHalConsoleState mExecState)
                     
                     startExecState mExecState
                     startStateView stbox $ prgState $ makeExecStateWithPre prg
@@ -103,16 +101,16 @@ startStateView stBox st = io $ do
                        ]
                 boxPackStart stBox hb PackNatural 2
 
-updateStateView :: Bool -> State -> GuiMonad ()
-updateStateView cleanAll prgSt = 
-                ask >>= \content -> getHGState >>= \st -> do
+updateStateView :: State -> GuiMonad ()
+updateStateView prgSt = 
+                ask >>= \content -> do
                 let stBox = content ^. (gHalCommConsole . cStateBox)
                 childs <- io $ containerGetChildren stBox
-                io $ postGUIAsync $ forM_ (zip childs (vars prgSt)) updateValue
+                io $ postGUIAsync $ forM_ (zip childs (vars prgSt)) updValue
     where
-        updateValue :: (Widget,StateTuple) -> IO ()
-        updateValue (w,BoolVar i mv) = updateValue' w i mv
-        updateValue (w,IntVar  i mv) = updateValue' w i mv
+        updValue :: (Widget,StateTuple) -> IO ()
+        updValue (w,BoolVar i mv) = updateValue' w i mv
+        updValue (w,IntVar  i mv) = updateValue' w i mv
         updateValue' :: Show a => Widget -> Identifier -> Maybe a -> IO ()
         updateValue' w i mv = do
                 let hb = castToHBox w
@@ -136,16 +134,16 @@ cleanPaintLineIO tv = do
             maybe (return ()) (textTagTableRemove table) mtag
 
 paintLine :: ExtComm -> GuiMonad ()
-paintLine comm = ask >>= io . paintLineIO comm
+paintLine eComm = ask >>= io . paintLineIO eComm
 
 paintLineIO :: ExtComm -> HGReader -> IO ()
-paintLineIO comm content = do
+paintLineIO eComm content = do
             let textV = content ^. gTextCode
-                line  = takeCommLine comm
+                line  = takeCommLine eComm
             
             buf   <- textViewGetBuffer textV
-            start <- textBufferGetStartIter buf
-            end   <- textBufferGetEndIter buf
+            tbStart <- textBufferGetStartIter buf
+            tbEnd   <- textBufferGetEndIter buf
             
             tag   <- textTagNew (Just "HighlightLine")
             set tag [ textTagParagraphBackground := evalLineColour
@@ -155,13 +153,13 @@ paintLineIO comm content = do
             table <- textBufferGetTagTable buf
             textTagTableAdd table tag
             
-            textIterForwardLines start (line-1)
-            start' <- textIterCopy start
-            textIterForwardLines start' 1
+            _ <- textIterForwardLines tbStart (line-1)
+            tbStart' <- textIterCopy tbStart
+            _ <- textIterForwardLines tbStart' 1
             
-            textBufferApplyTag buf tag start start'
+            _ <- textBufferApplyTag buf tag tbStart tbStart'
             
-            textBufferGetText buf start end False
+            _ <- textBufferGetText buf tbStart tbEnd False
             return ()
 
 configEvalConsole :: GuiMonad ()
@@ -178,14 +176,14 @@ configEvalConsole = ask >>= \content -> get >>= \st -> io $ do
                     stopB    = content ^. (gHalCommConsole . cStopButton   )
                     forkFlag = content ^. gHalForkFlag
                 
-                onClicked stepUB   (eval evalStepUp  content st)
-                onClicked stepDB   (forkEvalStepDown forkFlag content st)
-                onClicked contB    (forkEvalCont     forkFlag content st)
-                onClicked execB    (forkEvalExec     forkFlag content st)
-                onClicked breakB   (eval evalBreak   content st)
-                onClicked restartB (eval evalRestart content st)
-                onClicked cleanB   (eval evalClean   content st)
-                onClicked stopB    (eval evalStop    content st)
+                _ <- onClicked stepUB   (eval evalStepUp  content st)
+                _ <- onClicked stepDB   (forkEvalStepDown forkFlag content st)
+                _ <- onClicked contB    (forkEvalCont     forkFlag content st)
+                _ <- onClicked execB    (forkEvalExec     forkFlag content st)
+                _ <- onClicked breakB   (eval evalBreak   content st)
+                _ <- onClicked restartB (eval evalRestart content st)
+                _ <- onClicked cleanB   (eval evalClean   content st)
+                _ <- onClicked stopB    (eval evalStop    content st)
                 
                 widgetHideAll ebox
                 widgetHideAll stbox
@@ -195,11 +193,11 @@ forkEvalExec fflag content stref = do
         flagUpFork <- tryPutMVar fflag ()
         if flagUpFork
             then forkIO (eval (evalExecute >> 
-                               updateHGState ((<~) gForkThread Nothing)
+                               updateHGState ((.~) gForkThread Nothing)
                               ) content stref >> 
                         takeMVar fflag >> return ()) >>= \tid ->
                  readRef stref >>= \st ->
-                 writeRef stref ((<~) gForkThread (Just tid) st)
+                 writeRef stref ((.~) gForkThread (Just tid) st)
             else return ()
 
 evalExecute :: GuiMonad ()
@@ -220,14 +218,14 @@ evalExecute = ask >>= \content -> getHGState >>= \st -> do
     case (mPrgSt,mnexecComm) of
         (_,Nothing)-> return ()
         (Nothing,_)-> return ()
-        (Just prgSt,Just nexecComm) -> do
-            (m,(prgSt',_)) <- io $ ST.runStateT (evalExtComm nexecComm) (prgSt,win)
+        (Just prgSt',Just nexecComm) -> do
+            (m,(prgSt'',_)) <- io $ ST.runStateT (evalExtComm nexecComm) (prgSt',win)
             case m of
                 Nothing -> return ()
                 Just _ -> do
-                    let execSt' = updateExecState execSt (Nothing,Nothing) prgSt prgSt'
-                    updateHGState ((<~) gHalConsoleState (Just execSt'))
-                    updateStateView False prgSt'
+                    let execSt' = updateExecState execSt (Nothing,Nothing) prgSt' prgSt''
+                    updateHGState ((.~) gHalConsoleState (Just execSt'))
+                    updateStateView prgSt''
 
 evalStop :: GuiMonad ()
 evalStop = ask >>= \content -> io $ do
@@ -242,10 +240,7 @@ evalStop = ask >>= \content -> io $ do
 evalStepUp :: GuiMonad ()
 evalStepUp = ask >>= \content -> getHGState >>= \st ->
         let Just execSt = st ^. gHalConsoleState
-            prgSt      = prgState execSt
             hPrgStlist = hPrgState execSt
-            mexecComm  = executedTracePrg execSt
-            mnexecComm = nexecutedTracePrg execSt
         in
         case hPrgStlist of
             [] -> return ()
@@ -254,19 +249,19 @@ evalStepUp = ask >>= \content -> getHGState >>= \st ->
                     tv      = content ^. gTextCode
                 cleanPaintLine $ castToTextView tv
                 paintLine c
-                updateStateView False prgst
-                updateHGState ((<~) gHalConsoleState (Just execSt'))
+                updateStateView prgst
+                updateHGState ((.~) gHalConsoleState (Just execSt'))
 
 forkEvalStepDown:: MVar () -> HGReader -> HGStateRef -> IO ()
 forkEvalStepDown fflag content stref = do
         flagUpFork <- tryPutMVar fflag ()
         if flagUpFork
             then forkIO (eval (evalStepDown >> 
-                               updateHGState ((<~) gForkThread Nothing)
+                               updateHGState ((.~) gForkThread Nothing)
                               ) content stref >> 
                         takeMVar fflag >> return ()) >>= \tid ->
                  readRef stref >>= \st ->
-                 writeRef stref ((<~) gForkThread (Just tid) st)
+                 writeRef stref ((.~) gForkThread (Just tid) st)
             else return ()
 
 evalStepDown :: GuiMonad Bool
@@ -284,24 +279,24 @@ evalStepDown = getHGState >>= \st -> do
     
     case mPrgSt of
         Nothing -> return False
-        Just prgSt -> do
+        Just prgSt' -> do
             case mnexecComm of
                 Nothing -> return True
                 Just nexecComm -> 
                     ask >>= \content -> do
                     let win = content ^. gHalWindow
                     
-                    (mmc,(prgSt',_)) <- io $ ST.runStateT (evalStepExtComm nexecComm) (prgSt,win)
+                    (mmc,(prgSt'',_)) <- io $ ST.runStateT (evalStepExtComm nexecComm) (prgSt',win)
                     
                     case mmc of
                         Nothing -> return False
                         Just mc -> do
-                            let execSt' = updateExecState execSt mc prgSt prgSt'
+                            let execSt' = updateExecState execSt mc prgSt' prgSt''
                                 headC   = headNExecComm execSt'
                                 tv      = content ^. gTextCode
-                            updateHGState ((<~) gHalConsoleState (Just execSt'))
+                            updateHGState ((.~) gHalConsoleState (Just execSt'))
                             io $ postGUIAsync $ cleanPaintLineIO $ castToTextView tv
-                            updateStateView False prgSt'
+                            updateStateView prgSt'
                             maybe (return ()) 
                                   (io . postGUIAsync . flip paintLineIO content) headC
                             return True
@@ -341,7 +336,7 @@ takeInputs prgSt flagSt = ask >>= \content ->
                     
                     (idsBox,iels) <- fillEntryIds ids
                     
-                    on win keyPressEvent $ configWinAccions win iels
+                    _ <- on win keyPressEvent $ configWinAccions win iels
                     
                     configButtons win readyB cancelB iels flagSt
                     
@@ -367,10 +362,10 @@ takeInputs prgSt flagSt = ask >>= \content ->
         configButtons :: Window -> Button -> Button -> 
                          [(Identifier,Entry, Label)] -> MVar (Maybe State) -> 
                          IO ()
-        configButtons win readyB cancelB iels flagSt = do
+        configButtons win readyB cancelB iels flagst = do
             
-            onClicked cancelB $ putMVar flagSt Nothing >> widgetDestroy win
-            onClicked readyB  $ checkEntrys win iels
+            _ <- onClicked cancelB $ putMVar flagst Nothing >> widgetDestroy win
+            _ <- onClicked readyB  $ checkEntrys win iels
             
             return ()
             
@@ -414,14 +409,14 @@ takeInputs prgSt flagSt = ask >>= \content ->
             strValue <- entryGetText entry
             case idDataType i of
                 BoolTy -> case parseBConFromString strValue of
-                            Left er -> setMsg "Valor no valido." >> 
+                            Left _ -> setMsg "Valor no valido." >> 
                                        return Nothing
                             Right v -> do
                                     setMsg ""
                                     Just v' <- ST.evalStateT (evalBExp v) (initState,mainWin)
                                     return $ Just $ (i,Left $ v')
                 IntTy -> case parseConFromString strValue of
-                            Left er -> setMsg "Valor no valido." >> 
+                            Left _ -> setMsg "Valor no valido." >> 
                                        return Nothing
                             Right v -> do
                                     setMsg ""
@@ -439,8 +434,6 @@ takeInputs prgSt flagSt = ask >>= \content ->
                                        ] 
                              
                              widgetShowAll label
-                formatErrorMsg :: String -> String
-                formatErrorMsg msg = "<span foreground=\"red\">"++msg++"</span>"
 
 forkEvalCont :: MVar () -> HGReader -> HGStateRef -> IO ()
 forkEvalCont fflag content stref = do
@@ -448,12 +441,12 @@ forkEvalCont fflag content stref = do
                 if flagUpFork 
                     then forkIO evalC >>= \tid ->
                          readRef stref >>= \st ->
-                         writeRef stref ((<~) gForkThread (Just tid) st)
+                         writeRef stref ((.~) gForkThread (Just tid) st)
                     else return ()
     where
         evalC :: IO ()
         evalC = eval (evalCont >> 
-                      updateHGState ((<~) gForkThread Nothing)
+                      updateHGState ((.~) gForkThread Nothing)
                      ) content stref >> 
                 takeMVar fflag >>
                 return ()
@@ -495,24 +488,23 @@ evalBreak = ask >>= \content -> getHGState >>= \st -> do
             iter <- io $ textBufferGetIterAtMark buf mark
             i    <- io $ textIterGetLine iter
             
-            gutter <- io $ sourceViewGetGutter textV TextWindowLeft
-            marks  <- getMark gutter buf i
+            marks  <- getMark buf i
             
             if null marks
                then case addBreak execSt (i+1) of
                         Nothing -> return ()
                         Just execSt' -> do
                             addMarkBreak buf iter
-                            updateHGState ((<~) gHalConsoleState (Just $ execSt'))
+                            updateHGState ((.~) gHalConsoleState (Just $ execSt'))
                else case delBreak execSt (i+1) of
                         Nothing -> return ()
                         Just execSt' -> do
                             delMarkBreak buf marks
-                            io $ sourceGutterQueueDraw gutter
-                            updateHGState ((<~) gHalConsoleState (Just $ execSt'))
+                            io $ widgetQueueDraw textV
+                            updateHGState ((.~) gHalConsoleState (Just $ execSt'))
     where
-        getMark :: SourceGutter -> TextBuffer -> Int -> GuiMonad [SourceMark]
-        getMark gutter buf i = io $ do
+        getMark :: TextBuffer -> Int -> GuiMonad [SourceMark]
+        getMark buf i = io $ do
                 let sbuf = castToSourceBuffer buf
                 sourceBufferGetSourceMarksAtLine sbuf i breakMark
         delMarkBreak :: TextBuffer -> [SourceMark] -> GuiMonad ()
@@ -535,8 +527,8 @@ evalRestart = ask >>= \content -> getHGState >>= \st -> do
                   tv          = content ^. gTextCode
               
               cleanPaintLine $ castToTextView tv
-              updateHGState ((<~) gHalConsoleState (Just execSt'))
-              updateStateView True $ prgState execSt'
+              updateHGState ((.~) gHalConsoleState (Just execSt'))
+              updateStateView $ prgState execSt'
               maybe (return ()) paintLine headC
               io $ mapM_ (removeAllMarks tv) (prgBreaks execSt)
 
@@ -544,17 +536,16 @@ evalClean :: GuiMonad ()
 evalClean = ask >>= \content -> getHGState >>= \st -> do
             let Just execSt = st ^. gHalConsoleState
                 sv          = content ^. gTextCode
-            updateHGState ((<~) gHalConsoleState (Just execSt { prgBreaks = [] }))
+            updateHGState ((.~) gHalConsoleState (Just execSt { prgBreaks = [] }))
             io $ mapM_ (removeAllMarks sv) (prgBreaks execSt)
 
 removeAllMarks :: SourceView -> Int -> IO ()
 removeAllMarks sv i = do
             buf    <- textViewGetBuffer sv
-            gutter <- sourceViewGetGutter sv TextWindowLeft
             let sbuf = (castToSourceBuffer buf)
             marks <- sourceBufferGetSourceMarksAtLine sbuf (i-1) breakMark
             mapM_ (delMark sbuf) marks
-            sourceGutterQueueDraw gutter
+            io $ widgetQueueDraw sv
 
 delMark :: SourceBuffer -> SourceMark -> IO ()
 delMark sbuf mark = do
@@ -563,15 +554,15 @@ delMark sbuf mark = do
                     case (cat == breakMark,mmark) of
                         (_,Nothing) -> return ()
                         (False,_)   -> return ()
-                        (True,Just mark) -> textBufferDeleteMark sbuf mark
+                        (True,Just mark') -> textBufferDeleteMark sbuf mark'
 
 compile' :: GuiMonad (Maybe ExtProgram)
-compile' = get >>= \ref -> ask >>= \content ->
+compile' = ask >>= \content ->
         do
         let tcode = content ^. gTextCode
         code <- getCode tcode
         case parseExtPrgFromString code of
             Left er -> printErrorMsg ("Error :\n" ++ show er) >> return Nothing
-            Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
+            Right prg -> updateHGState ((.~) gHalPrg (Just prg)) >>
                          printInfoMsg "Programa compilado con exito." >>
                          return (Just prg)

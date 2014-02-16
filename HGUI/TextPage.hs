@@ -3,22 +3,13 @@
 module HGUI.TextPage where
 
 import Graphics.UI.Gtk hiding (get)
-import Graphics.UI.Gtk.Glade
 import Graphics.UI.Gtk.SourceView
 
-import Control.Monad.IO.Class
+import Control.Lens hiding (set)
 import Control.Monad.Trans.RWS
-import Control.Arrow
-
-import Lens.Family
-
-import Data.Text (Text,pack,unpack)
-import Data.Maybe (fromJust,fromMaybe)
-import Data.List (delete)
 
 import HGUI.GState
 import HGUI.Config
-import HGUI.Utils
 
 -- Configura el lenguaje para el sourceView.
 configLanguage :: SourceBuffer -> LangInfo -> IO ()
@@ -68,7 +59,6 @@ configScrolledWindow sw =
 -- | Crea un campo de texto y lo llena, de ser posible, con el string.
 createSourceView :: LangInfo -> IO SourceView
 createSourceView langi = do
-            hbox <- hBoxNew False 0
             buf <- sourceBufferNew Nothing
             configLanguage buf langi
             

@@ -4,25 +4,17 @@ module HGUI.Utils where
 
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView
-import System.Glib.GType
-import System.Glib.GObject
-
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader hiding (ask)
-import Control.Monad.Trans.State
-import Control.Monad.Trans.RWS 
 
 import Control.Applicative
 
-import Lens.Family
-
 import HGUI.GState
 
+textBufferInsertLn :: TextBufferClass self => self -> String -> IO ()
 textBufferInsertLn buf str = textBufferGetEndIter buf >>= \titer ->
                              textBufferInsert buf titer ('\n':str)
 
 getCode :: SourceView -> GuiMonad String
-getCode tv = ask >>= \content -> io $ 
+getCode tv = io $ 
         do
         let textV = castToTextView tv
         buf       <- textViewGetBuffer textV
@@ -50,8 +42,8 @@ putMsgSB st cid m = statusbarPush st cid m >> return ()
 setLoadedModuleInfo :: Label -> Maybe String -> IO ()
 setLoadedModuleInfo label Nothing = labelSetText label "Error al cargar el módulo" >>
                                     styleInfoError >>= widgetModifyFont label
-setLoadedModuleInfo label (Just mod) = styleInfoModule >>= widgetModifyFont label >>
-                                       labelSetText label mod
+setLoadedModuleInfo label (Just modN) = styleInfoModule >>= widgetModifyFont label >>
+                                       labelSetText label modN
 
 -- -- | Estilo para títulos en info-boxes
 styleInfoModule ::  IO (Maybe FontDescription)

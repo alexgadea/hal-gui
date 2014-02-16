@@ -28,7 +28,7 @@ takeCommLine (ExtIf     pos _ _ _) = sourceLine $ begin pos
 takeCommLine (ExtIAssig pos _ _)   = sourceLine $ begin pos
 takeCommLine (ExtBAssig pos _ _)   = sourceLine $ begin pos
 takeCommLine (ExtDo     pos _ _ _) = sourceLine $ begin pos
-takeCommLine (ExtSeq c c')         = takeCommLine c
+takeCommLine (ExtSeq c _)         = takeCommLine c
 
 getCommLines :: ExtComm -> [Int]
 getCommLines (ExtSeq c c')        = getCommLines c ++ getCommLines c'
@@ -79,3 +79,4 @@ convertExtCommToComm (ExtSeq c c') = Seq (convertExtCommToComm c)
 convertExtProgToProg :: ExtProgram -> Program
 convertExtProgToProg (ExtProg vars (ExtPre _ pre) ecomms (_,pos)) = 
                          Prog vars pre (convertExtCommToComm ecomms) pos
+convertExtProgToProg _ = error "Error en Precondición convirtiendo el programa."

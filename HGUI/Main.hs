@@ -6,7 +6,7 @@ import HGUI.Gui
 
 main :: IO ()
 main = do 
-    initGUI
+    _ <- initGUI
     
     xml <- builderNew
     builderAddFromFile xml "hal.ui"

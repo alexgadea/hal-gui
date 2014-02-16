@@ -3,26 +3,18 @@
 
 module HGUI.GState where
 
-import Lens.Family
-import Lens.Family.TH
-
 import Graphics.UI.Gtk hiding (get)
-import Graphics.UI.Gtk.MenuComboToolbar.ToggleToolButton
 import Graphics.UI.Gtk.SourceView
 
 import Control.Concurrent
-import Control.Concurrent.MVar
 
+import Control.Lens
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State hiding (State,get,put)
 import Control.Monad.Trans.RWS
 import Data.IORef
 import Data.Reference
 import Data.Text (Text)
-import qualified Data.Strict.Either as SEither
-
-import qualified Hal.Evaluation.EvalLang as HEval
 
 import HGUI.Evaluation.EvalState
 import HGUI.ExtendedLang (ExtProgram)
@@ -34,7 +26,7 @@ data HalToolbar = HalToolbar { _symFrameB  :: ToggleToolButton
                              , _axFrameB   :: ToggleToolButton
                              , _evalButton :: ToggleToolButton
                              }
-$(mkLenses ''HalToolbar)
+$(makeLenses ''HalToolbar)
 
 -- | Información sobre la lista de símbolos.
 data HalSymList = HalSymList { _gSymFrame    :: Frame
@@ -43,7 +35,7 @@ data HalSymList = HalSymList { _gSymFrame    :: Frame
                              , _gSymIconView :: IconView
                              , _gGoRightBox  :: HBox
                              }
-$(mkLenses ''HalSymList)
+$(makeLenses ''HalSymList)
 
 -- | Información sobre la lista de axiomas.
 data HalAxList = HalAxList { _gAxFrame     :: Frame 
@@ -51,10 +43,10 @@ data HalAxList = HalAxList { _gAxFrame     :: Frame
                            , _gAxRel       :: ComboBox
                            , _gAxLabelExpr :: Label
                            }
-$(mkLenses ''HalAxList)
+$(makeLenses ''HalAxList)
 
 data HalInfoConsole = HalInfoConsole { _infoConTView :: TextView }
-$(mkLenses ''HalInfoConsole)
+$(makeLenses ''HalInfoConsole)
 
 data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
                                      , _cEvalStateBox  :: VBox
@@ -68,10 +60,10 @@ data HalCommConsole = HalCommConsole { _cEvalBox       :: VBox
                                      , _cCleanButton   :: Button
                                      , _cStopButton    :: Button
                                      }
-$(mkLenses ''HalCommConsole)
+$(makeLenses ''HalCommConsole)
 
 data HalEditorPaned = HalEditorPaned { _epaned :: VPaned }
-$(mkLenses ''HalEditorPaned)
+$(makeLenses ''HalEditorPaned)
 
 -- Con ForkFlag restringimos la creación de un thread para evaluar. La idea
 -- es que si damos dos steps, el primero crea un thread pero el segundo no hace
@@ -92,7 +84,7 @@ data HGReader = HGReader { _gHalToolbar     :: HalToolbar
                          , _gHalForkFlag    :: MVar ()
                          , _gHalStopFlag    :: MVar ()
                          }
-$(mkLenses ''HGReader)
+$(makeLenses ''HGReader)
 
 -- | Tipo de mónada de estado, llevamos el environment de un modulo bien 
 -- chequeado y la info sobre la parte derecha de la interfaz, es decir, 
@@ -105,7 +97,7 @@ data HGState = HGState { _gHalConsoleState :: Maybe ExecState
                        , _gFileName        :: Maybe FilePath
                        , _gForkThread      :: Maybe ThreadId
                        }
-$(mkLenses ''HGState)
+$(makeLenses ''HGState)
 
 -- | Referencia del estado.
 type HGStateRef = IORef HGState
@@ -113,11 +105,6 @@ type HGStateRef = IORef HGState
 -- | Mónada de la interfaz.
 type GuiMonad' = RWST HGReader () HGStateRef 
 type GuiMonad = GuiMonad' IO
-
-instance Reference IORef (StateT HEval.State IO) where
-    newRef = liftIO . newRef
-    readRef = liftIO . readRef
-    writeRef r = liftIO . writeRef r
 
 instance Reference IORef (StateT HGStateRef IO) where
     newRef = liftIO . newRef

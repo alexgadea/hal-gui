@@ -6,13 +6,12 @@ import Control.Monad.Trans.RWS
 import Control.Monad.IO.Class
 import Control.Monad
 
-import Control.Concurrent
-import Control.Concurrent.STM
+import Control.Lens hiding (set)
 import qualified Control.Exception as C
 
 import qualified Data.Foldable as F
 import System.FilePath.Posix
-import Data.Maybe (fromMaybe,isJust,fromJust)
+import Data.Maybe (isJust,fromJust)
 import Data.Text hiding (take,init,drop)
 
 import HGUI.Console
@@ -24,21 +23,19 @@ import HGUI.Parser(parseExtPrgFromString)
 
 import Hal.Verification.WeakPre(generateFunFileString)
 
-import Lens.Family
-
 -- | En general, salvo aclaración, un archivo en este contexto es directamente
 -- un campo de texto con su respectivo nombre en la interfaz.
 
 -- | Crea un campo de texto al realizar una carga por archivo.
 createNewFileFromLoad :: Maybe TextFilePath -> Maybe (String,String) -> 
                          GuiMonad ()
-createNewFileFromLoad mfp mcode = getHGState >>= \st -> ask >>= \content ->
+createNewFileFromLoad mfp mcode =
         do
 --         unless (st ^. (gHalTextPage . isSave)) saveFile
---         updateHGState ((<~) gHalTextPage (HalTextPage mfp True))
+--         updateHGState ((.~) gHalTextPage (HalTextPage mfp True))
         maybe (return ())
-              (\name -> updateHGState ((<~) gFileName (Just $ unpack name)) >>
-                        updateHGState ((<~) gHalPrg Nothing))
+              (\name -> updateHGState ((.~) gFileName (Just $ unpack name)) >>
+                        updateHGState ((.~) gHalPrg Nothing))
               mfp
               
         createTextPage (mcode >>= return . fst)
@@ -49,7 +46,7 @@ createNewFile :: GuiMonad ()
 createNewFile = createNewFileFromLoad Nothing Nothing
 
 genProofObligations :: GuiMonad ()
-genProofObligations = ask >>= \content -> getHGState >>= \st ->
+genProofObligations = getHGState >>= \st ->
     do
         let mprg = st ^. gHalPrg
         let mfile = st ^. gFileName
@@ -88,9 +85,9 @@ dialogLoad label fileFilter action consoleView = do
                                     , ("Cancelar",ResponseCancel)]
 
     fileFilter dialog 
-    response <- dialogRun dialog
+    dResponse <- dialogRun dialog
     
-    case response of
+    case dResponse of
         ResponseAccept -> do
             selected <- fileChooserGetFilename dialog
             F.mapM_ (\filepath -> 
@@ -137,7 +134,7 @@ saveFile = getHGState >>= \st -> ask >>= \content ->
 
 -- | Guardado en, de un archivo. (esto sería guardar como no?, es decir saveAs)
 saveAtFile :: GuiMonad ()
-saveAtFile = getHGState >>= \st -> ask >>= \content ->
+saveAtFile = getHGState >>= \st ->
              do
              let nFile = maybe "" id (st ^. gFileName)
              
@@ -147,7 +144,7 @@ saveAtFile = getHGState >>= \st -> ask >>= \content ->
     where
         updateFL :: FilePath -> GuiMonad ()
         updateFL fp = let fname = dropExtension fp in
-                          updateHGState ((<~) gFileName $ Just fname)
+                          updateHGState ((.~) gFileName $ Just fname)
 
 -- | Dialogo general para guardar un archivo.
 saveDialog :: String -> String -> (FileChooserDialog -> IO ()) -> 
@@ -165,19 +162,19 @@ saveDialog label filename fileFilter = ask >>= \content ->
         
         io $ fileChooserSetCurrentName dialog filename
         io $ fileFilter dialog
-        response <- io $ dialogRun dialog
+        dResponse <- io $ dialogRun dialog
 
         codelisa <- getCode tcode
         codefun <- getCode tverif
         
-        case response of
+        case dResponse of
             ResponseAccept -> io (fileChooserGetFilename dialog) >>= 
                               \fp -> 
                               maybe (return ())
                                     (\f -> 
-                                    let filename = dropExtension f in
-                                        save (filename++".lisa") codelisa >> 
-                                        save (filename++".fun") codefun)
+                                    let fname = dropExtension f in
+                                        save (fname++".lisa") codelisa >> 
+                                        save (fname++".fun") codefun)
                                     fp >>
                                 io (widgetDestroy dialog) >> 
                                 return fp
@@ -211,7 +208,7 @@ compile = get >>= \st -> ask >>= \content ->
             case parseExtPrgFromString code of
                 Left er -> io (printErrorMsgIO ("Error compilando código: " ++ show er) consoleTV)
                            >> return False
-                Right prg -> updateHGState ((<~) gHalPrg (Just prg)) >>
+                Right prg -> updateHGState ((.~) gHalPrg (Just prg)) >>
                     io (printInfoMsgIO "Código compilado" consoleTV) >>
                     return True
 

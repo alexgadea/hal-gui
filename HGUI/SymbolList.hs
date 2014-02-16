@@ -10,8 +10,7 @@ import Graphics.UI.Gtk.SourceView
 
 import Data.Text(unpack)
 
-import Lens.Family
-
+import Control.Lens hiding (set)
 import Control.Monad.Trans.State hiding (get,put)
 import Control.Monad.Trans.RWS
 import Control.Applicative ((<$>))
@@ -20,7 +19,6 @@ import qualified Data.Foldable as F
 
 import HGUI.GState
 import HGUI.Config
-import HGUI.Utils
 
 type SymItem = String
 
@@ -58,7 +56,7 @@ configSymbolList = do
                 
                 list <- io listSymbols
                 io $ setupScrolledWindowSymbolList scrollW goLB goRB s
-                io $ setupSymbolList iv list
+                _ <- io $ setupSymbolList iv list
                 eventsSymbolList iv list
                 io $ widgetHideAll sf
                 
@@ -90,8 +88,8 @@ setupScrolledWindowSymbolList sw goLb goRb s = do
             goL <- makeScrollArrow goLb stockGoBack
             (Just  swslH) <- scrolledWindowGetHScrollbar sw
             adj <- rangeGetAdjustment swslH
-            setupScrollWithArrow adj goR scrollInc s
-            setupScrollWithArrow adj goL scrollDec s
+            _ <- setupScrollWithArrow adj goR scrollInc s
+            _ <- setupScrollWithArrow adj goL scrollDec s
             widgetSetChildVisible swslH False
             widgetHide swslH
             widgetShowAll goLb
@@ -124,13 +122,12 @@ eventsSymbolList :: IconView -> ListStore SymItem -> GuiMonad ()
 eventsSymbolList iv list = do
             content <- ask
             s <- get
-            io $ iv `on` itemActivated $ \path -> 
+            _ <- io $ iv `on` itemActivated $ \path -> 
                         evalRWST (oneSelection list path) content s >> return ()
             return ()
 
 oneSelection :: ListStore SymItem -> TreePath -> GuiMonad ()
-oneSelection list path = ask >>= \content ->
-                         getHGState >>= \st ->
+oneSelection list path = getHGState >>= \st ->
             do
                 let sv = st ^. gCurrentText 
                 el <- io (getElem list path)

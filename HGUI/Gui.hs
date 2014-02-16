@@ -3,13 +3,10 @@ module HGUI.Gui where
 import Graphics.UI.Gtk hiding (get)
 
 import Control.Concurrent
-import Control.Concurrent.MVar
 
+import Control.Lens hiding (set)
 import Control.Monad.Trans.RWS
 import Data.Reference
-
-import Lens.Family
-import Lens.Family.TH
 
 import HGUI.TextPage
 import HGUI.File
@@ -19,22 +16,20 @@ import HGUI.GState
 import HGUI.SymbolList
 import HGUI.AxiomList
 import HGUI.Config
-import HGUI.Evaluation.Eval
-import HGUI.Evaluation.EvalState
 
 mainHalGui :: Builder -> IO ()
 mainHalGui xml = do
                 (gReader,gState) <- makeGState xml
 
-                runRWST (do configWindow
-                            configMenuBarButtons xml
-                            configToolBarButtons xml
-                            configInfoConsole
-                            configSymbolList
-                            configAxiomList
-                            eventsSourceView
-                            configEvalConsole
-                         ) gReader gState
+                _ <- runRWST (do configWindow
+                                 configMenuBarButtons xml
+                                 configToolBarButtons xml
+                                 configInfoConsole
+                                 configSymbolList
+                                 configAxiomList
+                                 eventsSourceView
+                                 configEvalConsole
+                             ) gReader gState
 
                 return ()
 
@@ -42,7 +37,7 @@ mainHalGui xml = do
 makeGState :: Builder -> IO (HGReader,HGStateRef) 
 makeGState xml = do
         
-        symFrameB <- builderGetObject xml castToToggleToolButton "symHFrameButton"
+        symFraB <- builderGetObject xml castToToggleToolButton "symHFrameButton"
         
         symFrame   <- builderGetObject xml castToFrame "symFrame"
         goLeftBox  <- builderGetObject xml castToHBox "symGoLeftBox"
@@ -53,7 +48,7 @@ makeGState xml = do
         axFrame  <- builderGetObject xml castToFrame "axiomFrame"
         axTV     <- builderGetObject xml castToTreeView "axiomList"
         axRel    <- builderGetObject xml castToComboBox "comboAxioms"
-        axFrameB <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
+        axFraB   <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
         axLabExpr <- builderGetObject xml castToLabel "axiomExpr"
 
         edPaned <- builderGetObject xml castToVPaned "edPaned"
@@ -88,7 +83,7 @@ makeGState xml = do
         forkFlag <- newEmptyMVar
         stopFlag <- newMVar ()
         
-        let halToolbarST   = HalToolbar symFrameB axFrameB evalB
+        let halToolbarST   = HalToolbar symFraB axFraB evalB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
             halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
@@ -129,19 +124,19 @@ configToolBarButtons xml = ask >>= \content -> get >>= \st ->
         saveAtFButton   <- builderGetObject xml castToToolButton "saveHFileAtButton"
         proofOFButton   <- builderGetObject xml castToToolButton "proofOHFileButton"
         compileMButton  <- builderGetObject xml castToToolButton "compileHModuleButton"
-        evalButton      <- builderGetObject xml castToToggleToolButton "evalButton"
+        evaButton       <- builderGetObject xml castToToggleToolButton "evalButton"
         symFButton      <- builderGetObject xml castToToggleToolButton "symHFrameButton"
         axiomFButton    <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
         
-        onToolButtonClicked newFButton      (eval createNewFile content st)
-        onToolButtonClicked openFButton     (eval openFile content st)
-        onToolButtonClicked saveFButton     (eval saveFile content st)
-        onToolButtonClicked saveAtFButton   (eval saveAtFile content st)
-        onToolButtonClicked proofOFButton   (eval genProofObligations content st)
-        onToolButtonClicked compileMButton  (eval compile content st >> return ())
-        onToolButtonClicked evalButton      (eval configEvalButton content st)
-        onToolButtonClicked symFButton      (eval configSymFrameButton content st)
-        onToolButtonClicked axiomFButton    (eval configAxFrameButton content st)
+        _ <- onToolButtonClicked newFButton      (eval createNewFile content st)
+        _ <- onToolButtonClicked openFButton     (eval openFile content st)
+        _ <- onToolButtonClicked saveFButton     (eval saveFile content st)
+        _ <- onToolButtonClicked saveAtFButton   (eval saveAtFile content st)
+        _ <- onToolButtonClicked proofOFButton   (eval genProofObligations content st)
+        _ <- onToolButtonClicked compileMButton  (eval compile content st >> return ())
+        _ <- onToolButtonClicked evaButton       (eval configEvalButton content st)
+        _ <- onToolButtonClicked symFButton      (eval configSymFrameButton content st)
+        _ <- onToolButtonClicked axiomFButton    (eval configAxFrameButton content st)
         
         return ()
 
@@ -156,11 +151,11 @@ configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
             saveAsB <- builderGetObject xml castToMenuItem "saveAsButton"
             quitB   <- builderGetObject xml castToMenuItem "quitButton"
             
-            onActivateLeaf newB    $ eval createNewFile    content st
-            onActivateLeaf openB   $ eval openFile         content st
-            onActivateLeaf saveB   $ eval saveFile         content st
-            onActivateLeaf saveAsB $ eval saveAtFile       content st
-            onActivateLeaf quitB   $ widgetDestroy window
+            _ <- onActivateLeaf newB    $ eval createNewFile    content st
+            _ <- onActivateLeaf openB   $ eval openFile         content st
+            _ <- onActivateLeaf saveB   $ eval saveFile         content st
+            _ <- onActivateLeaf saveAsB $ eval saveAtFile       content st
+            _ <- onActivateLeaf quitB   $ widgetDestroy window
             
             return ()
 
@@ -172,7 +167,7 @@ configWindow = ask >>= \content -> get >>= \stref ->
             
             windowMaximize window
             widgetShowAll window
-            onDestroy window $ mainQuit >> forkQuit stref
+            _ <- onDestroy window $ mainQuit >> forkQuit stref
             return ()
     where
         forkQuit :: HGStateRef -> IO ()
@@ -187,12 +182,12 @@ eventsSourceView = ask >>= \content ->
         let textcode = content ^. gTextCode
         let textverif = content ^. gTextVerif
     
-        io (textcode `on` buttonPressEvent $ io $
-                eval (updateHGState ((<~) gCurrentText textcode)) content st >>
+        _ <-  io (textcode `on` buttonPressEvent $ io $
+                eval (updateHGState ((.~) gCurrentText textcode)) content st >>
                 return False)
                 
-        io (textverif `on` buttonPressEvent $ io $
-                eval (updateHGState ((<~) gCurrentText textverif)) content st >>
+        _ <- io (textverif `on` buttonPressEvent $ io $
+                eval (updateHGState ((.~) gCurrentText textverif)) content st >>
                 return False)
         
         return ()

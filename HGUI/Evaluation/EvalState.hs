@@ -21,14 +21,14 @@ data ExecState = ExecState { executedTracePrg  :: Maybe ExtComm
                            }
 
 makeExecState :: ExtProgram -> ExecState
-makeExecState (ExtProg vars pre comms post) = ExecState Nothing 
+makeExecState (ExtProg vars _ comms _) = ExecState Nothing 
                                                         (Just comms)
                                                         (fillState initState vars)
                                                         []
                                                         []
 
 makeExecStateWithPre :: ExtProgram -> ExecState
-makeExecStateWithPre (ExtProg vars pre comms post) = 
+makeExecStateWithPre (ExtProg vars pre comms _) = 
         ExecState Nothing (Just $ ExtSeq pre comms) 
                           (fillState initState vars) [] []
 
@@ -82,7 +82,7 @@ headNExecComm (ExecState _ Nothing _ _ _)      = Nothing
 headNExecComm (ExecState _ (Just comms) _ _ _) = Just $ takeHead comms
     where
         takeHead :: ExtComm -> ExtComm
-        takeHead (ExtSeq c c') = takeHead c
+        takeHead (ExtSeq c _) = takeHead c
         takeHead c = c
 
 -- | Elemento de un estado. Representa el valor de una variable en un momento
@@ -104,9 +104,11 @@ prettyMaybe (Just v) = show v
     
 fromRight :: Either a b -> b
 fromRight (Right b) = b
+fromRight _ = error "Not Right"
 
 fromLeft :: Either a b -> a
 fromLeft (Left a) = a
+fromLeft _ = error "Not left"
     
 instance Eq StateTuple where
     (IntVar i _) == (IntVar i' _) = i == i'

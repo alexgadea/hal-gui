@@ -2,10 +2,6 @@
 module HGUI.Parser where
 
 import qualified Data.Map as M
-import Data.Text(pack,unpack)
-
-import Control.Monad.IO.Class
-import Control.Monad.Identity
 
 -- Imports Parsec
 import Text.Parsec 
@@ -17,7 +13,6 @@ import qualified Equ.Expr as Equ
 -- Imports de Hal
 import Hal.Lang
 import Hal.Parser
-import Hal.Symbols
 
 -- Imports de Hal-Gui
 import HGUI.ExtendedLang
@@ -28,9 +23,9 @@ extSingle :: String -> (CommPos -> ExtComm) -> ParserH ExtComm
 extSingle s ec = try $ do
               st <- getParserState
               let initp = statePos st
-              sym s
-              st <- getParserState
-              let endp = statePos st
+              _ <- sym s
+              st' <- getParserState
+              let endp = statePos st'
               return $ ec $ makeCommPos initp endp
 
 -- | Skip
@@ -51,8 +46,8 @@ extAssignInt = try $ do
                oper ":="
                iexp <- intexp 
                
-               st <- getParserState
-               let endp = statePos st
+               st' <- getParserState
+               let endp = statePos st'
                return $ ExtIAssig (makeCommPos initp endp) acc iexp
 
 extAssignBool :: ParserH ExtComm
@@ -64,8 +59,8 @@ extAssignBool = try $ do
                 oper ":="
                 bexp <- boolexp 
                 
-                st <- getParserState
-                let endp = statePos st
+                st' <- getParserState
+                let endp = statePos st'
                 return $ ExtBAssig (makeCommPos initp endp) acc bexp
 
 -- |Condicional.      
@@ -82,8 +77,8 @@ extIfthen = try $ do
             c' <- extComm
             keyword "fi"
             
-            st <- getParserState
-            let endp = statePos st
+            st' <- getParserState
+            let endp = statePos st'
             return $ ExtIf (makeCommPos initp endp) b c c'
 
 -- | Assert
@@ -94,8 +89,8 @@ extAssert = try $ do
             
             f <- formfun
             
-            st <- getParserState
-            let endp = statePos st
+            st' <- getParserState
+            let endp = statePos st'
             return $ ExtAssert (makeCommPos initp endp) f
 
 -- | Do - While
@@ -112,8 +107,8 @@ extWhile = try $ do
            c <- extComm
            keyword "od"
            
-           st <- getParserState
-           let endp = statePos st
+           st' <- getParserState
+           let endp = statePos st'
            return (ExtDo (makeCommPos initp endp) form b c)
 
 -- | Precondición
@@ -122,17 +117,17 @@ extPrec = try $ do
           st <- getParserState
           let initp = statePos st
           
-          sym "{"
+          _ <- sym "{"
           whites
           keyword "Pre"
-          sym ":"
+          _ <- sym ":"
           whites 
           e <- PEqu.parsePreExpr
           whites
-          sym "}"
+          _ <- sym "}"
           
-          st <- getParserState
-          let endp = statePos st
+          st' <- getParserState
+          let endp = statePos st'
           return $ ExtPre (makeCommPos initp endp) (Equ.Expr e)
 
 -- | Precondición
@@ -141,17 +136,17 @@ extPost = try $ do
           st <- getParserState
           let initp = statePos st
           
-          sym "{"
+          _ <- sym "{"
           whites
           keyword "Post"
-          sym ":"
+          _ <- sym ":"
           whites 
           e <- PEqu.parsePreExpr
           whites
-          sym "}"
+          _ <- sym "}"
           
-          st <- getParserState
-          let endp = statePos st
+          st' <- getParserState
+          let endp = statePos st'
           return (makeCommPos initp endp, Equ.Expr e)
 
 -- | Comandos del lenguaje LISA
@@ -174,9 +169,9 @@ extProgram = varinputs >>
              vardefs >>
              extPrec >>= \pre ->
              extComm >>= \c ->
-             extPost >>= \post ->
+             extPost >>= \postc ->
              getParserState >>= return . M.elems . pvars . stateUser >>= \vars ->
-             return $ ExtProg vars pre c post
+             return $ ExtProg vars pre c postc
 
 -- | Función principal de parseo desde String
 parseExtPrgFromString :: String -> Either ParseError ExtProgram

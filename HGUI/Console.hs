@@ -5,11 +5,10 @@ module HGUI.Console ( configInfoConsole
                     , printErrorMsgIO
                     ) where
 
-import Control.Monad.Trans.RWS (ask)
-
-import Lens.Family
-
 import Graphics.UI.Gtk hiding (get)
+
+import Control.Lens hiding (set)
+import Control.Monad.Trans.RWS (ask)
 
 import HGUI.Config
 import HGUI.GState
@@ -25,10 +24,10 @@ configConsoleTV tv  = do
                 , textTagForegroundSet := True]
         textTagTableAdd tagTable tag
         
-        tag <- textTagNew (Just "InfoScheme")
-        set tag [ textTagForegroundGdk := textColorCommTV
+        tag' <- textTagNew (Just "InfoScheme")
+        set tag' [ textTagForegroundGdk := textColorCommTV
                 , textTagForegroundSet := True]
-        textTagTableAdd tagTable tag
+        textTagTableAdd tagTable tag'
         
         widgetModifyBase tv StateNormal backColorCommTV
         widgetModifyText tv StateNormal textColorCommTV
@@ -66,8 +65,8 @@ printMsg' tagname msg infoTV = do
             -- Ingresamos el texto en el buffer
             putStrAtEnd infoBuf infoTV msg
                 
-            titer <- textBufferGetEndIter infoBuf
-            lineEnd <- textIterGetLine titer
+            titer' <- textBufferGetEndIter infoBuf
+            lineEnd <- textIterGetLine titer'
                 
             start <- textBufferGetIterAtLine infoBuf lineStart
             end <- textBufferGetIterAtLine infoBuf lineEnd
