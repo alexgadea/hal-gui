@@ -23,7 +23,6 @@ type TextFilePath = Text
 
 -- | Información sobre los items del toolBar.
 data HalToolbar = HalToolbar { _symFrameB  :: ToggleToolButton
-                             , _axFrameB   :: ToggleToolButton
                              , _evalButton :: ToggleToolButton
                              }
 $(makeLenses ''HalToolbar)
@@ -37,13 +36,6 @@ data HalSymList = HalSymList { _gSymFrame    :: Frame
                              }
 $(makeLenses ''HalSymList)
 
--- | Información sobre la lista de axiomas.
-data HalAxList = HalAxList { _gAxFrame     :: Frame 
-                           , _gAxTreeView  :: TreeView
-                           , _gAxRel       :: ComboBox
-                           , _gAxLabelExpr :: Label
-                           }
-$(makeLenses ''HalAxList)
 
 data HalInfoConsole = HalInfoConsole { _infoConTView :: TextView }
 $(makeLenses ''HalInfoConsole)
@@ -73,12 +65,10 @@ $(makeLenses ''HalEditorPaned)
 -- es parar cualquier ejecución que no tenga final.
 data HGReader = HGReader { _gHalToolbar     :: HalToolbar
                          , _gHalSymbolList  :: HalSymList
-                         , _gHalAxList      :: HalAxList
                          , _gHalEditorPaned :: HalEditorPaned
                          , _gHalWindow      :: Window
                          , _gHalInfoConsole :: HalInfoConsole
                          , _gTextCode       :: SourceView
-                         , _gTextVerif      :: SourceView
                          , _gInfoConsole    :: TextView
                          , _gHalCommConsole :: HalCommConsole
                          , _gHalForkFlag    :: MVar ()

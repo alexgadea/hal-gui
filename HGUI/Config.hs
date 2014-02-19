@@ -27,6 +27,8 @@ textStyleFileHal = textStylesFolder ++ "/lisa.xml"
 
 halMimeType = "text/lisa"
 
+executableFun = "fun-gui"
+
 data LangInfo = LangInfo {
                     specFile :: String
                   , styleFile :: String

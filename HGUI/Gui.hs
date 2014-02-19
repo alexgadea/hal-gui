@@ -14,7 +14,6 @@ import HGUI.Console
 import HGUI.EvalConsole
 import HGUI.GState
 import HGUI.SymbolList
-import HGUI.AxiomList
 import HGUI.Config
 
 mainHalGui :: Builder -> IO ()
@@ -26,7 +25,6 @@ mainHalGui xml = do
                                  configToolBarButtons xml
                                  configInfoConsole
                                  configSymbolList
-                                 configAxiomList
                                  eventsSourceView
                                  configEvalConsole
                              ) gReader gState
@@ -44,12 +42,6 @@ makeGState xml = do
         scrollW    <- builderGetObject xml castToScrolledWindow "swSymbolList"
         symIV      <- builderGetObject xml castToIconView "symbolList"
         goRightBox <- builderGetObject xml castToHBox "symGoRightBox"
-        
-        axFrame  <- builderGetObject xml castToFrame "axiomFrame"
-        axTV     <- builderGetObject xml castToTreeView "axiomList"
-        axRel    <- builderGetObject xml castToComboBox "comboAxioms"
-        axFraB   <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
-        axLabExpr <- builderGetObject xml castToLabel "axiomExpr"
 
         edPaned <- builderGetObject xml castToVPaned "edPaned"
         
@@ -72,20 +64,16 @@ makeGState xml = do
         stopB    <- builderGetObject xml castToButton "stopButton"
         
         boxLisa <- builderGetObject xml castToVBox "boxLisaCode"
-        boxFun  <- builderGetObject xml castToVBox "boxFunCode"
         
         textcode <- createSourceView halLangInfo
-        textverif <- createSourceView funLangInfo
         
         configText boxLisa textcode
-        configText boxFun textverif
         
         forkFlag <- newEmptyMVar
         stopFlag <- newMVar ()
         
-        let halToolbarST   = HalToolbar symFraB axFraB evalB
+        let halToolbarST   = HalToolbar symFraB evalB
             halSymListST   = HalSymList symFrame goLeftBox scrollW symIV goRightBox
-            halAxListST    = HalAxList axFrame axTV axRel axLabExpr
             halEditorPaned = HalEditorPaned edPaned
             halCommConsole = HalCommConsole evalBox evalStateBox stateBox
                                             stepUB stepDB contB execB breakB 
@@ -100,12 +88,10 @@ makeGState xml = do
                               
         let gReader = HGReader halToolbarST
                                halSymListST
-                               halAxListST
                                halEditorPaned
                                window
                                (HalInfoConsole infoTV)
                                textcode
-                               textverif
                                infoTV
                                halCommConsole
                                forkFlag
@@ -126,7 +112,6 @@ configToolBarButtons xml = ask >>= \content -> get >>= \st ->
         compileMButton  <- builderGetObject xml castToToolButton "compileHModuleButton"
         evaButton       <- builderGetObject xml castToToggleToolButton "evalButton"
         symFButton      <- builderGetObject xml castToToggleToolButton "symHFrameButton"
-        axiomFButton    <- builderGetObject xml castToToggleToolButton "AxiomFrameButton"
         
         _ <- onToolButtonClicked newFButton      (eval createNewFile content st)
         _ <- onToolButtonClicked openFButton     (eval openFile content st)
@@ -136,7 +121,6 @@ configToolBarButtons xml = ask >>= \content -> get >>= \st ->
         _ <- onToolButtonClicked compileMButton  (eval compile content st >> return ())
         _ <- onToolButtonClicked evaButton       (eval configEvalButton content st)
         _ <- onToolButtonClicked symFButton      (eval configSymFrameButton content st)
-        _ <- onToolButtonClicked axiomFButton    (eval configAxFrameButton content st)
         
         return ()
 
@@ -180,14 +164,8 @@ eventsSourceView = ask >>= \content ->
                    get >>= \st ->
     do
         let textcode = content ^. gTextCode
-        let textverif = content ^. gTextVerif
     
         _ <-  io (textcode `on` buttonPressEvent $ io $
                 eval (updateHGState ((.~) gCurrentText textcode)) content st >>
                 return False)
-                
-        _ <- io (textverif `on` buttonPressEvent $ io $
-                eval (updateHGState ((.~) gCurrentText textverif)) content st >>
-                return False)
-        
         return ()

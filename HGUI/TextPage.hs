@@ -95,22 +95,7 @@ createTextPage mcode = ask >>= \content -> do
             maybe (return ())
                   (io . textBufferInsert tbuf start)
                   mcode
-                  
-createTextFunPage :: Maybe String -> GuiMonad ()
-createTextFunPage mcode = ask >>= \content -> do
-            
-            let textverif = content ^. gTextVerif
-            
-            -- borramos el código viejo:
-            tbuf <- io $ textViewGetBuffer textverif
-            
-            start <- io $ textBufferGetStartIter tbuf
-            end   <- io $ textBufferGetEndIter tbuf
-            io $ textBufferDelete tbuf start end
-            
-            maybe (return ())
-                  (io . textBufferInsert tbuf start)
-                  mcode
+
 
 configTextPage :: GuiMonad ()
 configTextPage = createTextPage Nothing

@@ -11,6 +11,7 @@ import qualified Control.Exception as C
 
 import qualified Data.Foldable as F
 import System.FilePath.Posix
+import System.Process(runCommand)
 import Data.Maybe (isJust,fromJust)
 import Data.Text hiding (take,init,drop)
 
@@ -18,6 +19,7 @@ import HGUI.Console
 import HGUI.GState
 import HGUI.TextPage
 import HGUI.Utils
+import HGUI.Config(executableFun)
 import HGUI.ExtendedLang
 import HGUI.Parser(parseExtPrgFromString)
 
@@ -39,7 +41,6 @@ createNewFileFromLoad mfp mcode =
               mfp
               
         createTextPage (mcode >>= return . fst)
-        createTextFunPage (mcode >>= return . snd)
 
 -- | Crea un nuevo archivo en blanco.
 createNewFile :: GuiMonad ()
@@ -55,7 +56,9 @@ genProofObligations = getHGState >>= \st ->
               (\prg ->
                 maybe (printErrorMsg "El archivo no está guardado")
                       (\fname -> io (generateFunFileString (takeFileName fname) $ convertExtProgToProg prg) >>=
-                       \strfun -> createTextFunPage $ Just strfun)
+                       \strfun -> io (writeFile (fname++".fun") strfun) >>
+                       io (runCommand (executableFun ++ " " ++ fname ++".fun")) >> return ()
+                       )
                       mfile)
               mprg
 
@@ -118,19 +121,17 @@ setFileFilter fChooser patterns title = do
 -- | Guardado directo de un archivo.
 saveFile :: GuiMonad ()
 saveFile = getHGState >>= \st -> ask >>= \content ->
-        let (tc,tv) = (content ^. gTextCode,content ^. gTextVerif) in
+           let tc = content ^. gTextCode in
             case st ^. gFileName of
                 Nothing -> saveAtFile
                 Just fn -> do
-                        codelisa <- getCode tc
-                        codefun <- getCode tv
-                        save fn codelisa codefun
-    where
-        save:: FilePath -> String -> String ->GuiMonad ()
-        save filename codelisa codefun = 
-            let (filelisa,filefun) = (filename++".lisa",filename++".fun") in
-                io (writeFile filelisa codelisa) >>
-                io (writeFile filefun codefun)
+                            codelisa <- getCode tc
+                            save fn codelisa
+        where
+            save:: FilePath -> String -> GuiMonad ()
+            save filename codelisa  = 
+                let filelisa = filename++".lisa" in
+                    io (writeFile filelisa codelisa)
 
 -- | Guardado en, de un archivo. (esto sería guardar como no?, es decir saveAs)
 saveAtFile :: GuiMonad ()
@@ -152,7 +153,6 @@ saveDialog :: String -> String -> (FileChooserDialog -> IO ()) ->
 saveDialog label filename fileFilter = ask >>= \content ->
         do
         let tcode = content ^. gTextCode
-            tverif = content ^. gTextVerif
         dialog <- io $ fileChooserDialogNew (Just label) 
                                             Nothing 
                                             FileChooserActionSave 
@@ -165,7 +165,6 @@ saveDialog label filename fileFilter = ask >>= \content ->
         dResponse <- io $ dialogRun dialog
 
         codelisa <- getCode tcode
-        codefun <- getCode tverif
         
         case dResponse of
             ResponseAccept -> io (fileChooserGetFilename dialog) >>= 
@@ -173,8 +172,7 @@ saveDialog label filename fileFilter = ask >>= \content ->
                               maybe (return ())
                                     (\f -> 
                                     let fname = dropExtension f in
-                                        save (fname++".lisa") codelisa >> 
-                                        save (fname++".fun") codefun)
+                                        save (fname++".lisa") codelisa)
                                     fp >>
                                 io (widgetDestroy dialog) >> 
                                 return fp
