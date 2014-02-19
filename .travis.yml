@@ -1,0 +1,8 @@
+language: haskell
+
+before_install:
+    - git submodule update --init --recursive
+    - cabal install fun/equ/equ.cabal
+    - sudo cabal install gtk2hs-buildtools --global
+    - sudo apt-get install libgtksourceview2.0-dev
+    - cabal install fun/fun.cabal

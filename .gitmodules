@@ -1,0 +1,3 @@
+[submodule "fun"]
+	path = fun
+	url = https://github.com/alexgadea/fun.git
