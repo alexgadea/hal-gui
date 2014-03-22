@@ -153,7 +153,7 @@ evalExprFun (Expr f) isPre =
                        if PExpr.preExprIsQuant f then return (Just ())
                        else do
                        (st,win) <- ST.get
-                       let funExpr = Fun.eval (makeEnv st) f
+                       let funExpr = Fun.eval f (makeEnv st) 
                        if Expr funExpr == FOL.true
                        then return $ Just ()
                        else if Expr funExpr == FOL.false
