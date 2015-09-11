@@ -11,6 +11,9 @@ import Control.Monad.Trans.RWS
 import HGUI.GState
 import HGUI.Config
 
+import System.Glib.UTFString
+import Control.Applicative
+
 -- Configura el lenguaje para el sourceView.
 configLanguage :: SourceBuffer -> LangInfo -> IO ()
 configLanguage buf langinfo = do
@@ -25,7 +28,7 @@ configLanguage buf langinfo = do
     case mlang of
         Nothing -> putStrLn $ "WARNING: No se puede cargar el highlighting para el lenguaje" ++ (specFile langinfo)
         Just lang -> do
-            langId <- sourceLanguageGetId lang
+            langId <- stringToGlib <$> sourceLanguageGetId lang
             putStrLn ("Lenguaje = "++show langId)
             sourceBufferSetLanguage buf (Just lang)
 
@@ -47,7 +50,8 @@ configSourceView sv = do
         sourceViewSetShowLineNumbers sv True
         sourceViewSetShowLineMarks sv True
         sourceViewSetHighlightCurrentLine sv True
-        sourceViewSetMarkCategoryIconFromStock sv breakMark (Just stockMediaRecord)
+        sourceViewSetMarkCategoryIconFromStock sv 
+                                (stringToGlib breakMark) (Just stockMediaRecord)
 
 -- | Configuración de la ventana de scroll, que contiene el campo de texto.
 configScrolledWindow :: ScrolledWindow -> IO ()

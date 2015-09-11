@@ -11,7 +11,7 @@ import qualified Control.Monad.Trans.State as ST (runStateT,evalStateT)
 import Control.Concurrent
 
 import Data.Maybe
-import Data.Text (unpack)
+import Data.Text ( Text, unpack )
 import Data.Reference
 
 import Hal.Parser
@@ -25,6 +25,10 @@ import HGUI.Utils
 import HGUI.Console
 import HGUI.Evaluation.Eval
 import HGUI.Evaluation.EvalState
+
+
+import System.Glib.UTFString
+import Control.Applicative
 
 configEvalButton :: GuiMonad ()
 configEvalButton = ask >>= \content -> do
@@ -145,7 +149,7 @@ paintLineIO eComm content = do
             tbStart <- textBufferGetStartIter buf
             tbEnd   <- textBufferGetEndIter buf
             
-            tag   <- textTagNew (Just "HighlightLine")
+            tag   <- textTagNew (Just $ stringToGlib "HighlightLine")
             set tag [ textTagParagraphBackground := evalLineColour
                     , textTagParagraphBackgroundSet := True
                     ]
@@ -159,7 +163,7 @@ paintLineIO eComm content = do
             
             _ <- textBufferApplyTag buf tag tbStart tbStart'
             
-            _ <- textBufferGetText buf tbStart tbEnd False
+            _ <- stringToGlib <$> textBufferGetText buf tbStart tbEnd False
             return ()
 
 configEvalConsole :: GuiMonad ()
@@ -352,7 +356,7 @@ takeInputs prgSt flagSt = ask >>= \content ->
                             EventM EKey Bool
         configWinAccions win iels = do
                            ev <- eventKeyName
-                           case ev of
+                           case glibToString ev of
                                "Escape" -> io $ putMVar flagSt Nothing >> 
                                                 widgetDestroy win >> 
                                                 return True
@@ -391,7 +395,7 @@ takeInputs prgSt flagSt = ask >>= \content ->
                                                          ++ ":" ++ 
                                                          show (idDataType i))
                             entry    <- entryNew
-                            errLabel <- labelNew Nothing
+                            errLabel <- labelNew (Nothing :: Maybe Text)
                             hbox     <- hBoxNew False 0
                             
                             boxPackStart hbox idLabel  PackNatural 1
@@ -550,7 +554,7 @@ removeAllMarks sv i = do
 delMark :: SourceBuffer -> SourceMark -> IO ()
 delMark sbuf mark = do
                     cat  <- sourceMarkGetCategory mark 
-                    mmark <- textBufferGetMark sbuf breakMark
+                    mmark <- textBufferGetMark sbuf (stringToGlib breakMark)
                     case (cat == breakMark,mmark) of
                         (_,Nothing) -> return ()
                         (False,_)   -> return ()

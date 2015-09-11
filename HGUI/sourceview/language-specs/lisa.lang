@@ -7,6 +7,8 @@
     <styles>
       <style id="keyword" _name="Keyword" map-to="def:keyword"/>
       <style id="escaped-character" _name="Escaped Character" map-to="def:special-char"/>
+      <style id="operators" _name="Operators" map-to="def:operators"/>
+      <style id="constant" _name="Constant" map-to="def:constant"/>
       <style id="type" _name="Data Type" map-to="def:type"/>
       <style id="assertion" _name="Assertion" map-to="def:justificationProof"/>
     </styles>
@@ -37,6 +39,17 @@
                 <context id="types" style-ref="type">
                     <keyword>Int</keyword>
                     <keyword>Bool</keyword>
+                </context>
+
+		 <context id="constant" style-ref="constant">
+                    <keyword>True</keyword>
+                    <keyword>False</keyword>
+                </context>
+		
+		<context id="operators" style-ref="operators">
+                    <keyword>not</keyword>
+		    <keyword> \+ </keyword>
+		    <keyword> \- </keyword>
                 </context>
 
             </include>

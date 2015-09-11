@@ -1,3 +1,4 @@
+{-# Language OverloadedStrings #-}
 module HGUI.Console ( configInfoConsole
                     , printInfoMsg
                     , printErrorMsg

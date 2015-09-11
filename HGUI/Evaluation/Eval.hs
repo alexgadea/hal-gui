@@ -2,7 +2,7 @@
     
     Para evaluar asumimos el programa typechekeo sin problemas.
 -}
-{-# LANGUAGE RecordWildCards, DoAndIfThenElse #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, DoAndIfThenElse #-}
 module HGUI.Evaluation.Eval where
 
 import Graphics.UI.Gtk hiding (get,Plus,eventKeyName)
@@ -39,12 +39,12 @@ showErrMsg mainWin msg = postGUIAsync $ do
             win  <- windowNew
             vbox <- vBoxNew False 0
             
-            label <- labelNew Nothing 
+            label <- labelNew (Nothing :: Maybe String)
             set label [ labelLabel := formatErrorMsg msg
                       , labelUseMarkup := True
                       ] 
             
-            readyB <- buttonNewWithLabel "Aceptar"
+            readyB <- buttonNewWithLabel ("Aceptar" :: String)
             
             set win [ windowWindowPosition := WinPosCenter
                     , windowModal          := True
@@ -203,7 +203,7 @@ evalExtComm (ExtPre _ f) = evalExprFun f True
 evalExtComm (ExtIf _ b c c') = evalBExp b >>= \vb ->
                     case vb of
                         Nothing    -> return Nothing
-                        Just True  -> evalExtComm c 
+                        Just True  -> evalExtComm c
                         Just False -> evalExtComm c'
 evalExtComm (ExtIAssig _ a e) = do 
             mevalE <- evalExp e

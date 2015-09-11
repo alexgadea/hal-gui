@@ -1,4 +1,4 @@
-module div
+module Div
 
 let thm 
 	oblig0 = (¬ (y=0)∧¬ (y<0))∧¬ (x<0)⇒x=y*0+x∧¬ (x<0)
