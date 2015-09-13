@@ -5,6 +5,7 @@ import Graphics.UI.Gtk hiding (get)
 import Control.Concurrent
 
 import Control.Lens hiding (set)
+import Control.Monad ( void )
 import Control.Monad.Trans.RWS
 import Data.Reference
 
@@ -104,25 +105,28 @@ configToolBarButtons :: Builder -> GuiMonad ()
 configToolBarButtons xml = ask >>= \content -> get >>= \st ->
         io $ do
         
-        newFButton      <- builderGetObject xml castToToolButton "newHFileButton"
-        openFButton     <- builderGetObject xml castToToolButton "openHFileButton"
-        saveFButton     <- builderGetObject xml castToToolButton "saveHFileButton"
-        saveAtFButton   <- builderGetObject xml castToToolButton "saveHFileAtButton"
-        proofOFButton   <- builderGetObject xml castToToolButton "proofOHFileButton"
-        compileMButton  <- builderGetObject xml castToToolButton "compileHModuleButton"
-        evaButton       <- builderGetObject xml castToToggleToolButton "evalButton"
-        symFButton      <- builderGetObject xml castToToggleToolButton "symHFrameButton"
+        newFButton      <- bGetObject "newHFileButton"
+        openFButton     <- bGetObject "openHFileButton"
+        saveFButton     <- bGetObject "saveHFileButton"
+        saveAtFButton   <- bGetObject "saveHFileAtButton"
+        proofOFButton   <- bGetObject "proofOHFileButton"
+        compileMButton  <- bGetObject "compileHModuleButton"
+        evaButton       <- bGetObject "evalButton"
+        symFButton      <- bGetObject "symHFrameButton"
         
-        _ <- onToolButtonClicked newFButton      (eval createNewFile content st)
-        _ <- onToolButtonClicked openFButton     (eval openFile content st)
-        _ <- onToolButtonClicked saveFButton     (eval saveFile content st)
-        _ <- onToolButtonClicked saveAtFButton   (eval saveAtFile content st)
-        _ <- onToolButtonClicked proofOFButton   (eval genProofObligations content st)
-        _ <- onToolButtonClicked compileMButton  (eval compile content st >> return ())
-        _ <- onToolButtonClicked evaButton       (eval configEvalButton content st)
-        _ <- onToolButtonClicked symFButton      (eval configSymFrameButton content st)
+        void $ onTBClicked newFButton     (eval createNewFile content st)
+        void $ onTBClicked openFButton    (eval openFile content st)
+        void $ onTBClicked saveFButton    (eval saveFile content st)
+        void $ onTBClicked saveAtFButton  (eval saveAtFile content st)
+        void $ onTBClicked proofOFButton  (eval genProofObligations content st)
+        void $ onTBClicked compileMButton (eval compile content st >> return ())
+        void $ onTBClicked evaButton      (eval configEvalButton content st)
+        void $ onTBClicked symFButton     (eval configSymFrameButton content st)
         
         return ()
+    where
+        onTBClicked = onToolButtonClicked
+        bGetObject  = builderGetObject xml castToToolButton
 
 configMenuBarButtons :: Builder -> GuiMonad ()
 configMenuBarButtons xml = ask >>= \content -> get >>= \st ->
