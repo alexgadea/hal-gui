@@ -64,6 +64,10 @@
   <style name="def:constant"                foreground="magenta"/>
   <style name="def:special-char"            foreground="violet"/>
 
+  <!-- Operators -->
+  <style name="def:operators"                foreground="green"/>
+  <style name="def:special-char"            foreground="violet"/>
+
   <!-- Identifiers -->
   <style name="def:identifier"              foreground="cyan"/>
 

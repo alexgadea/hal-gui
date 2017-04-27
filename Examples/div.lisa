@@ -3,19 +3,20 @@ varinput x: Int;
 varinput y: Int;
 
 vardef q: Int;
+vardef b: Bool;
 vardef r: Int;
 
-{ Pre: ¬ (y = 0) ∧ ¬ (y < 0) ∧ ¬ (x < 0) }
+{ Pre: True }
 
 r  := x;
 q := 0;
+b := True;
 
-{ q + 40 = 20*2 };
-
-while (y < r || y = r) { x = y * q + r ∧ ¬ (r < 0)}
+while (True) { True}
     do
         r := r - y;
-        q := q + 1
+        q := q + 1;
+        b := not b;
     od;
 
-{ Post: x = y * q + r ∧ ¬ (r <= 0) ∧ r < Y }
+{ Post: True}
